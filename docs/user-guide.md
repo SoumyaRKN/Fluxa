@@ -108,14 +108,91 @@ Understanding this distinction is the key to getting **full functionality** on e
 
 ## Running Fluxa — Platform Guide
 
-> **Quick orientation:** Every section below follows the same pattern:
+> **You do not need to know programming or install any development tools.**
+> Fluxa ships as a single pre-built binary. Just download it and run it.
 >
-> 1. Prerequisites
-> 2. Install dependencies
-> 3. Build Fluxa
-> 4. Run and verify locally
-> 5. Find your IP and connect from another device
-> 6. Optional: run as a background service at boot
+> The "Build from source" steps at the end of each section are optional — only needed if your platform isn't in the release list or you want to modify Fluxa.
+
+---
+
+### Quick Install (All Platforms)
+
+#### Linux / macOS — one command
+
+Open a terminal and run:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/SoumyaRKN/Fluxa/main/install.sh | bash
+```
+
+The script downloads the right binary for your machine, installs it to `~/.local/bin`, and prints what to do next. Done.
+
+#### Windows — one command
+
+Open **PowerShell** (press Win+R → type `powershell` → Enter) and run:
+
+```powershell
+irm https://raw.githubusercontent.com/SoumyaRKN/Fluxa/main/install.ps1 | iex
+```
+
+A desktop shortcut **Fluxa** is created. Double-click it to start.
+
+#### Android (Termux)
+
+1. Install **Termux** from F-Droid (not Play Store) — see the [Android section](#android--full-peer-via-termux) for details
+2. In Termux, run:
+
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/SoumyaRKN/Fluxa/main/install-termux.sh | bash
+   ```
+
+#### Manual download (no terminal required)
+
+If you prefer to download manually:
+
+1. Go to **<https://github.com/SoumyaRKN/Fluxa/releases/latest>**
+2. Download the file for your platform:
+
+   | Your device | File to download |
+   |-------------|-----------------|
+   | Linux (64-bit PC) | `fluxa-linux-x86_64.tar.gz` |
+   | Linux (ARM64, e.g. Raspberry Pi 4/5) | `fluxa-linux-aarch64.tar.gz` |
+   | macOS (Intel) | `fluxa-macos-x86_64.tar.gz` |
+   | macOS (Apple Silicon — M1/M2/M3/M4) | `fluxa-macos-aarch64.tar.gz` |
+   | Windows | `fluxa-windows-x86_64.zip` |
+   | Android (most phones, ARM64) | `fluxa-android-aarch64.tar.gz` |
+
+3. Extract the archive:
+   - **Windows:** right-click the ZIP → "Extract All" → open the folder → run `fluxa.exe`
+   - **Linux/macOS:** open a terminal in the folder:
+
+     ```bash
+     tar -xzf fluxa-*.tar.gz
+     chmod +x fluxa
+     ./fluxa
+     ```
+
+4. Open **<http://localhost:7070>** in your browser.
+
+---
+
+### After starting Fluxa
+
+No matter how you installed it, the experience is the same:
+
+1. Fluxa starts and prints the URL it's listening on
+2. Open **<http://localhost:7070>** on the same machine — you see your files
+3. Find your machine's IP address to share with other devices on your network:
+   - **Linux/macOS:** run `ip addr` or `ifconfig`
+   - **Windows:** run `ipconfig` in PowerShell
+   - **Or:** click the **QR code** button in Fluxa — scan it with any phone
+4. On other devices: open a browser → type `http://YOUR_IP:7070`
+
+---
+
+### Per-platform details (optional reading)
+
+The sections below explain per-platform specifics — firewall rules, background services, extra configuration, and how to build from source if you need to. **You don't need to read them to get started.**
 
 ---
 
@@ -123,7 +200,64 @@ Understanding this distinction is the key to getting **full functionality** on e
 
 **Full capability: ✅ Server · ✅ Discovery · ✅ Transfers · ✅ Browser**
 
-#### Prerequisites
+#### Install (recommended — no build required)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/SoumyaRKN/Fluxa/main/install.sh | bash
+fluxa
+```
+
+Open **<http://localhost:7070>**. Done.
+
+#### Find your LAN IP (for other devices to connect)
+
+```bash
+ip addr show | grep "inet " | grep -v "127.0.0.1"
+# Example: inet 192.168.1.42/24 ...
+```
+
+Other devices on the same network open `http://192.168.1.42:7070`.
+
+#### Open firewall (if UFW is active)
+
+```bash
+sudo ufw allow 7070/tcp comment "Fluxa HTTP"
+sudo ufw allow 5353/udp comment "Fluxa mDNS discovery"
+```
+
+#### Run as a service (starts at boot)
+
+```bash
+sudo tee /etc/systemd/system/fluxa.service > /dev/null << EOF
+[Unit]
+Description=Fluxa LAN File Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=$USER
+ExecStart=$(which fluxa)
+Environment=FLUXA_ROOT=/home/$USER
+Environment=FLUXA_PORT=7070
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now fluxa
+sudo systemctl status fluxa    # should say "active (running)"
+```
+
+#### Build from source (optional — only if you want to modify Fluxa)
+
+<details>
+<summary>Click to expand source build instructions</summary>
+
+##### Prerequisites
 
 | Requirement | Minimum | Check |
 |------------|---------|-------|
@@ -155,7 +289,7 @@ rustc --version  # rustc 1.75+
 
 ```bash
 # Clone the repo (or extract a downloaded archive)
-git clone https://github.com/your-org/Fluxa.git
+git clone https://github.com/SoumyaRKN/Fluxa.git
 cd Fluxa
 
 # Build frontend (outputs to backend/public/)
@@ -238,11 +372,27 @@ sudo systemctl enable --now fluxa
 sudo systemctl status fluxa    # should say "active (running)"
 ```
 
+</details>
+
 ---
 
 ### Fedora / RHEL / CentOS
 
 **Full capability: ✅ Server · ✅ Discovery · ✅ Transfers · ✅ Browser**
+
+#### Quick install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/SoumyaRKN/Fluxa/main/install.sh | bash
+fluxa
+```
+
+Open **<http://localhost:7070>**. LAN IP: `ip addr show | grep "inet "`.
+
+Firewall (if firewalld is active): `sudo firewall-cmd --permanent --add-port=7070/tcp && sudo firewall-cmd --reload`
+
+<details>
+<summary>Build from source (optional)</summary>
 
 #### Step 1 — Install dependencies
 
@@ -260,7 +410,7 @@ node --version && rustc --version
 #### Step 2 — Build and run
 
 ```bash
-git clone https://github.com/your-org/Fluxa.git && cd Fluxa
+git clone https://github.com/SoumyaRKN/Fluxa.git && cd Fluxa
 cd frontend && npm install && npm run build && cd ..
 cd backend && cargo build --release
 ./target/release/fluxa
@@ -284,11 +434,25 @@ sudo cp backend/target/release/fluxa /usr/local/bin/fluxa
 sudo systemctl enable --now fluxa
 ```
 
+</details>
+
 ---
 
 ### Arch Linux / Manjaro
 
 **Full capability: ✅ Server · ✅ Discovery · ✅ Transfers · ✅ Browser**
+
+#### Quick install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/SoumyaRKN/Fluxa/main/install.sh | bash
+fluxa
+```
+
+Open **<http://localhost:7070>**. LAN IP: `ip addr show | grep "inet "`.
+
+<details>
+<summary>Build from source (optional)</summary>
 
 #### Step 1 — Install dependencies
 
@@ -303,7 +467,7 @@ node --version && rustc --version
 #### Step 2 — Build and run
 
 ```bash
-git clone https://github.com/your-org/Fluxa.git && cd Fluxa
+git clone https://github.com/SoumyaRKN/Fluxa.git && cd Fluxa
 cd frontend && npm install && npm run build && cd ..
 cd backend && cargo build --release
 ./target/release/fluxa
@@ -314,6 +478,8 @@ Open **<http://localhost:7070>**. Your LAN IP: `ip addr show | grep "inet "`.
 No separate firewall step needed on a default Arch install (no firewall is active by default).  
 If you use `ufw` or `nftables`, allow TCP 7070 and UDP 5353.
 
+</details>
+
 ---
 
 ### macOS
@@ -321,6 +487,24 @@ If you use `ufw` or `nftables`, allow TCP 7070 and UDP 5353.
 **Full capability: ✅ Server · ✅ Discovery · ✅ Transfers · ✅ Browser**
 
 Tested on macOS 12 Monterey, 13 Ventura, 14 Sonoma, 15 Sequoia (Intel and Apple Silicon).
+
+#### Quick install
+
+Open **Terminal** (Cmd+Space → type "Terminal" → Enter):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/SoumyaRKN/Fluxa/main/install.sh | bash
+fluxa
+```
+
+macOS will ask: *"Do you want the application 'fluxa' to accept incoming network connections?"* — click **Allow**.
+
+Open **<http://localhost:7070>**. Find your LAN IP: `ipconfig getifaddr en0` (Wi-Fi).
+
+**Launch at login:** The installer sets this up automatically. To do it manually, see the details below.
+
+<details>
+<summary>Build from source / launch agent setup (optional)</summary>
 
 #### Step 1 — Install Homebrew
 
@@ -419,6 +603,8 @@ launchctl load "$HOME/Library/LaunchAgents/app.fluxa.plist"
 
 Fluxa now starts automatically every time you log in.
 
+</details>
+
 ---
 
 ### Windows (native)
@@ -426,6 +612,24 @@ Fluxa now starts automatically every time you log in.
 **Full capability: ✅ Server · ✅ Discovery · ✅ Transfers · ✅ Browser**
 
 Tested on Windows 10 (20H2+) and Windows 11.
+
+#### Quick install
+
+Open **PowerShell** (press Win+R → type `powershell` → Enter):
+
+```powershell
+irm https://raw.githubusercontent.com/SoumyaRKN/Fluxa/main/install.ps1 | iex
+```
+
+A **Fluxa** shortcut is created on your desktop. Double-click it to start.  
+Or: open PowerShell and type `fluxa` after the install finishes.
+
+Windows Firewall will show a dialog the first time — tick **both** checkboxes (Private + Public) and click **Allow access**.
+
+Find your LAN IP: open PowerShell → `ipconfig` → look for IPv4 Address under your Wi-Fi adapter.
+
+<details>
+<summary>Build from source / Task Scheduler setup (optional)</summary>
 
 #### Step 1 — Install prerequisites
 
@@ -540,6 +744,8 @@ Fluxa will now launch in a terminal window whenever you log in.
    → General tab → tick "Run whether user is logged on or not"  
    → tick "Run with highest privileges" → OK
 
+</details>
+
 ---
 
 ### Windows — WSL2
@@ -547,6 +753,21 @@ Fluxa will now launch in a terminal window whenever you log in.
 **Full capability: ✅ Server · ✅ Discovery · ✅ Transfers · ✅ Browser**
 
 Use this if you prefer a Linux environment on Windows. WSL2 runs a real Linux kernel.
+
+#### Quick install
+
+1. Enable WSL2 (one-time, PowerShell as Administrator): `wsl --install` → reboot
+2. In the Ubuntu terminal that opens after reboot:
+
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/SoumyaRKN/Fluxa/main/install.sh | bash
+   fluxa
+   ```
+
+3. From other LAN devices: follow the port-proxy steps in the details below.
+
+<details>
+<summary>Port proxy setup / build from source (optional)</summary>
 
 #### Step 1 — Enable WSL2
 
@@ -574,7 +795,7 @@ Open the **Ubuntu** terminal (search "Ubuntu" in Start menu). Then follow the **
 sudo apt update && sudo apt install -y nodejs git
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 source "$HOME/.cargo/env"
-git clone https://github.com/your-org/Fluxa.git && cd Fluxa
+git clone https://github.com/SoumyaRKN/Fluxa.git && cd Fluxa
 cd frontend && npm install && npm run build && cd ..
 cd backend && cargo build --release
 ./target/release/fluxa
@@ -626,6 +847,8 @@ ipconfig | findstr "IPv4"
 >
 > Save and run `wsl --shutdown`, then restart WSL2. Now WSL2 shares your Windows network interface and is directly reachable at the same IP.
 
+</details>
+
 ---
 
 ### Raspberry Pi / ARM Linux
@@ -633,6 +856,22 @@ ipconfig | findstr "IPv4"
 **Full capability: ✅ Server · ✅ Discovery · ✅ Transfers · ✅ Browser**
 
 Tested on Raspberry Pi 3B+, 4, 5 running Raspberry Pi OS Bookworm (64-bit) and Ubuntu Server 24.04.
+
+#### Quick install
+
+SSH into your Pi (or open a terminal on it directly), then:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/SoumyaRKN/Fluxa/main/install.sh | bash
+fluxa
+```
+
+Find the Pi's IP to share with other devices: `hostname -I`
+
+To run Fluxa automatically at every boot, follow the systemd steps in the details below.
+
+<details>
+<summary>Headless setup / systemd service / build from source (optional)</summary>
 
 #### Step 1 — Set up the Pi (headless / no monitor)
 
@@ -681,7 +920,7 @@ node --version && rustc --version
 #### Step 4 — Build Fluxa
 
 ```bash
-git clone https://github.com/your-org/Fluxa.git
+git clone https://github.com/SoumyaRKN/Fluxa.git
 cd Fluxa
 cd frontend && npm install && npm run build && cd ..
 cd backend && cargo build --release
@@ -761,6 +1000,8 @@ FLUXA_ROOT=/mnt/usb ./target/release/fluxa
 # /dev/sda1  /mnt/usb  auto  defaults,nofail  0  0
 ```
 
+</details>
+
 ---
 
 ### NAS / Headless Server
@@ -768,6 +1009,20 @@ FLUXA_ROOT=/mnt/usb ./target/release/fluxa
 **Full capability: ✅ Server · ✅ Discovery · ✅ Transfers · ✅ Browser**
 
 This covers any always-on Linux server: home NAS boxes, old laptops repurposed as servers, Synology/QNAP via SSH, TrueNAS SCALE, Ubuntu Server, etc.
+
+#### Quick install (native Linux NAS or server)
+
+SSH into the server and run:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/SoumyaRKN/Fluxa/main/install.sh | bash
+FLUXA_ROOT=/path/to/share fluxa
+```
+
+For NAS devices where the install script can’t run (no curl/bash), download the matching binary from [GitHub Releases](https://github.com/SoumyaRKN/Fluxa/releases/latest), copy it to the NAS, and run it directly.
+
+<details>
+<summary>Synology, QNAP, multi-instance, build from source (optional)</summary>
 
 #### Approach 1 — Native Linux NAS (or any Linux server)
 
@@ -836,6 +1091,8 @@ FLUXA_ROOT=/srv/media     FLUXA_PORT=7071 /usr/local/bin/fluxa &
      >> /etc/config/autorun.sh
    ```
 
+</details>
+
 ---
 
 ### Android — Full Peer via Termux
@@ -843,6 +1100,25 @@ FLUXA_ROOT=/srv/media     FLUXA_PORT=7071 /usr/local/bin/fluxa &
 **Full capability: ✅ Server · ✅ Discovery · ✅ Transfers · ✅ Browser**
 
 Termux gives Android a real Linux environment with native ARM binaries. Your Android device becomes a **full Fluxa peer** — visible to other devices via mDNS, with browsable files, full bi-directional transfers.
+
+#### Quick install
+
+1. Install **Termux** from **F-Droid** (visit <https://f-droid.org> on your phone — NOT the Play Store)
+2. Open Termux and run:
+
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/SoumyaRKN/Fluxa/main/install-termux.sh | bash
+   ```
+
+   The script handles everything: storage access, download, and auto-start setup.
+
+3. Run `bash ~/start-fluxa.sh` — Fluxa starts and prints your phone's IP
+4. From any PC/browser on the same Wi-Fi: `http://PHONE_IP:7070`
+
+> **Why F-Droid?** The Termux app on the Play Store is years out of date with broken packages. F-Droid has the current version.
+
+<details>
+<summary>Manual step-by-step setup / build from source (optional)</summary>
 
 #### Step 1 — Install Termux from F-Droid
 
@@ -914,7 +1190,7 @@ pkg install rust nodejs git binutils -y
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/Fluxa.git
+git clone https://github.com/SoumyaRKN/Fluxa.git
 cd Fluxa
 
 # Build the frontend
@@ -1016,6 +1292,8 @@ Every reboot automatically starts Fluxa. Your phone is always a discoverable fil
 | `getprop: not found` | Replace `$(getprop ro.product.model)` with a static name like `"MyPhone"` |
 | Build takes too long | Normal on older phones. Patience — it only happens once |
 
+</details>
+
 ---
 
 ### iOS — Options and Limitations
@@ -1106,6 +1384,22 @@ npm install -g serve
 
 Requires ChromeOS 69+ (nearly all Chromebooks sold from 2018 onwards).
 
+#### Quick install
+
+1. Enable Linux: **Settings → Advanced → Developers → Linux development environment → Turn On** (allocate at least 5 GB)
+2. Open the **Terminal** app that appears in your launcher and run:
+
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/SoumyaRKN/Fluxa/main/install.sh | bash
+   fluxa
+   ```
+
+3. Open Chrome → go to **<http://localhost:7070>** — it works immediately
+4. Other devices on your network use your Chromebook's Wi-Fi IP (find it in ChromeOS Settings → Network)
+
+<details>
+<summary>Port forwarding / Google Drive access / build from source (optional)</summary>
+
 #### Step 1 — Enable Linux development environment (Crostini)
 
 1. Click the system clock (bottom-right) → **Settings** (gear icon)
@@ -1131,7 +1425,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 source "$HOME/.cargo/env"
 
 # Build
-git clone https://github.com/your-org/Fluxa.git
+git clone https://github.com/SoumyaRKN/Fluxa.git
 cd Fluxa
 cd frontend && npm install && npm run build && cd ..
 cd backend && cargo build --release
@@ -1168,6 +1462,8 @@ FLUXA_ROOT=/mnt/chromeos/MyFiles/Downloads ./target/release/fluxa
 # Or share everything accessible from ChromeOS
 FLUXA_ROOT=/mnt/chromeos ./target/release/fluxa
 ```
+
+</details>
 
 ---
 

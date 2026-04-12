@@ -40,15 +40,59 @@ Fluxa is a **cross-platform, portable, LAN-based smart file explorer and transfe
 
 ---
 
-## Quick Start
+## Quick Start — Download & Run
+
+> No Rust, no Node.js, no compilation — just download and go.
+
+### Linux / macOS
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/SoumyaRKN/Fluxa/main/install.sh | bash
+```
+
+Then run `fluxa` in your terminal and open **<http://localhost:7070>**.
+
+### Windows
+
+Open **PowerShell** and run:
+
+```powershell
+irm https://raw.githubusercontent.com/SoumyaRKN/Fluxa/main/install.ps1 | iex
+```
+
+A desktop shortcut is created automatically. Double-click it to start Fluxa.
+
+### Android (via Termux from F-Droid)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/SoumyaRKN/Fluxa/main/install-termux.sh | bash
+```
+
+### Manual download
+
+Download the binary for your platform from [**GitHub Releases**](https://github.com/SoumyaRKN/Fluxa/releases/latest):
+
+| Platform | Download |
+|----------|---------|
+| Linux x86-64 | `fluxa-linux-x86_64.tar.gz` |
+| Linux ARM64 | `fluxa-linux-aarch64.tar.gz` |
+| macOS Intel | `fluxa-macos-x86_64.tar.gz` |
+| macOS Apple Silicon | `fluxa-macos-aarch64.tar.gz` |
+| Windows | `fluxa-windows-x86_64.zip` |
+| Android (ARM64) | `fluxa-android-aarch64.tar.gz` |
+
+Extract the archive, make the binary executable (Linux/macOS: `chmod +x fluxa`), and run it.
+
+---
+
+## Build from Source
+
+Only needed if you want to modify Fluxa or your platform isn't in the release list.
 
 ### Prerequisites
 
-- **Linux / macOS / Windows** (cross-platform)
-- **Rust 1.75+** and **Node.js 18+** (only for building from source)
+- **Rust 1.75+** and **Node.js 18+**
 - Devices must be on the **same LAN / Wi-Fi network**
-
-### Build & Run from Source
 
 ```bash
 # Clone / navigate to project

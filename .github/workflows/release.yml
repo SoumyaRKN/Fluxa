@@ -1,0 +1,287 @@
+# .github/workflows/release.yml
+#
+# Builds Fluxa for all platforms and publishes binaries to GitHub Releases
+# whenever a tag matching v*.*.* is pushed.
+#
+# Produces these release assets:
+#   fluxa-linux-x86_64.tar.gz
+#   fluxa-linux-aarch64.tar.gz
+#   fluxa-macos-x86_64.tar.gz
+#   fluxa-macos-aarch64.tar.gz       (Apple Silicon)
+#   fluxa-windows-x86_64.zip
+#   fluxa-android-aarch64.tar.gz
+#   fluxa-android-armv7.tar.gz
+#   SHA256SUMS                       (checksums for all assets)
+
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write   # needed to create GitHub Releases and upload assets
+
+jobs:
+  # ── Build frontend once, share as artifact ──────────────────────────────────
+  build-frontend:
+    name: Build frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build React app
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+      - name: Upload frontend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: backend/public/
+
+  # ── Matrix: native Linux & macOS builds ─────────────────────────────────────
+  build-native:
+    name: Build — ${{ matrix.target }}
+    needs: build-frontend
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            asset_name: fluxa-linux-x86_64
+            archive: tar.gz
+
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            asset_name: fluxa-linux-aarch64
+            archive: tar.gz
+            cross: true
+
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            asset_name: fluxa-macos-x86_64
+            archive: tar.gz
+
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            asset_name: fluxa-macos-aarch64
+            archive: tar.gz
+
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            asset_name: fluxa-windows-x86_64
+            archive: zip
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: backend/public/
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cross-compiler (Linux aarch64 only)
+        if: matrix.cross == true
+        run: sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Configure cross-compilation (Linux aarch64 only)
+        if: matrix.cross == true
+        run: |
+          mkdir -p backend/.cargo
+          cat >> backend/.cargo/config.toml << EOF
+          [target.aarch64-unknown-linux-gnu]
+          linker = "aarch64-linux-gnu-gcc"
+          EOF
+
+      - name: Build release binary
+        working-directory: backend
+        run: cargo build --release --target ${{ matrix.target }}
+        env:
+          CARGO_TERM_COLOR: always
+
+      - name: Package (tar.gz)
+        if: matrix.archive == 'tar.gz'
+        shell: bash
+        run: |
+          mkdir dist
+          cp backend/target/${{ matrix.target }}/release/fluxa dist/fluxa
+          tar -czf ${{ matrix.asset_name }}.tar.gz -C dist fluxa
+
+      - name: Package (zip — Windows)
+        if: matrix.archive == 'zip'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist | Out-Null
+          Copy-Item "backend\target\${{ matrix.target }}\release\fluxa.exe" dist\fluxa.exe
+          Compress-Archive -Path dist\fluxa.exe -DestinationPath "${{ matrix.asset_name }}.zip"
+
+      - name: Upload archive artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: ${{ matrix.asset_name }}.${{ matrix.archive }}
+
+  # ── Android cross-compile (aarch64 + armv7) ──────────────────────────────────
+  build-android:
+    name: Build — Android (${{ matrix.arch }})
+    needs: build-frontend
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - arch: aarch64
+            target: aarch64-linux-android
+            asset_name: fluxa-android-aarch64
+            api: 26
+
+          - arch: armv7
+            target: armv7-linux-androideabi
+            asset_name: fluxa-android-armv7
+            api: 26
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: backend/public/
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Set up Android NDK
+        uses: android-actions/setup-android@v3
+
+      - name: Configure Android cross-compilation
+        run: |
+          NDK_HOME="$ANDROID_SDK_ROOT/ndk/$(ls $ANDROID_SDK_ROOT/ndk | sort -V | tail -1)"
+          TOOLCHAIN="$NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
+
+          mkdir -p backend/.cargo
+          if [[ "${{ matrix.arch }}" == "aarch64" ]]; then
+            LINKER="$TOOLCHAIN/aarch64-linux-android${{ matrix.api }}-clang"
+            TARGET_KEY="aarch64-linux-android"
+          else
+            LINKER="$TOOLCHAIN/armv7a-linux-androideabi${{ matrix.api }}-clang"
+            TARGET_KEY="armv7-linux-androideabi"
+          fi
+
+          cat >> backend/.cargo/config.toml << EOF
+          [target.$TARGET_KEY]
+          linker = "$LINKER"
+          EOF
+
+      - name: Build release binary
+        working-directory: backend
+        run: cargo build --release --target ${{ matrix.target }}
+        env:
+          CARGO_TERM_COLOR: always
+
+      - name: Package
+        run: |
+          mkdir dist
+          cp backend/target/${{ matrix.target }}/release/fluxa dist/fluxa
+          tar -czf ${{ matrix.asset_name }}.tar.gz -C dist fluxa
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: ${{ matrix.asset_name }}.tar.gz
+
+  # ── Create GitHub Release and upload all assets ──────────────────────────────
+  release:
+    name: Publish GitHub Release
+    needs: [build-native, build-android]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+          merge-multiple: true
+
+      - name: Generate SHA256 checksums
+        run: |
+          cd artifacts
+          sha256sum fluxa-*.tar.gz fluxa-*.zip > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "Fluxa ${{ steps.version.outputs.version }}"
+          body: |
+            ## Fluxa ${{ steps.version.outputs.version }}
+
+            ### Quick Install
+
+            **Linux / macOS:**
+            ```bash
+            curl -fsSL https://raw.githubusercontent.com/SoumyaRKN/Fluxa/main/install.sh | bash
+            ```
+
+            **Windows (PowerShell):**
+            ```powershell
+            irm https://raw.githubusercontent.com/SoumyaRKN/Fluxa/main/install.ps1 | iex
+            ```
+
+            **Android (Termux):**
+            ```bash
+            curl -fsSL https://raw.githubusercontent.com/SoumyaRKN/Fluxa/main/install-termux.sh | bash
+            ```
+
+            ### Manual Downloads
+
+            | Platform | File |
+            |----------|------|
+            | Linux x86-64 | `fluxa-linux-x86_64.tar.gz` |
+            | Linux ARM64 | `fluxa-linux-aarch64.tar.gz` |
+            | macOS Intel | `fluxa-macos-x86_64.tar.gz` |
+            | macOS Apple Silicon (M1/M2/M3/M4) | `fluxa-macos-aarch64.tar.gz` |
+            | Windows x64 | `fluxa-windows-x86_64.zip` |
+            | Android ARM64 (most phones) | `fluxa-android-aarch64.tar.gz` |
+            | Android ARMv7 (older phones) | `fluxa-android-armv7.tar.gz` |
+
+            Verify downloads: `sha256sum --check SHA256SUMS`
+
+            ### After downloading
+
+            **Linux / macOS / Android:**
+            ```bash
+            tar -xzf fluxa-*.tar.gz
+            chmod +x fluxa
+            ./fluxa
+            # Then open http://localhost:7070
+            ```
+
+            **Windows:** Extract the ZIP and run `fluxa.exe`.
+          files: |
+            artifacts/fluxa-*.tar.gz
+            artifacts/fluxa-*.zip
+            artifacts/SHA256SUMS
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
