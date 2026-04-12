@@ -5,12 +5,45 @@ use tower_http::{
     trace::TraceLayer,
 };
 use axum::{
+    body::Body,
+    http::{header, StatusCode, Uri},
+    response::Response,
     routing::get,
     Router,
 };
+use rust_embed::RustEmbed;
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 use chrono::Utc;
+
+#[derive(RustEmbed)]
+#[folder = "public/"]
+struct Assets;
+
+async fn serve_asset(uri: Uri) -> Response {
+    let path = uri.path().trim_start_matches('/');
+    let path = if path.is_empty() { "index.html" } else { path };
+
+    match Assets::get(path) {
+        Some(content) => {
+            let mime = mime_guess::from_path(path).first_or_octet_stream();
+            Response::builder()
+                .header(header::CONTENT_TYPE, mime.as_ref())
+                .body(Body::from(content.data))
+                .unwrap()
+        }
+        None => match Assets::get("index.html") {
+            Some(content) => Response::builder()
+                .header(header::CONTENT_TYPE, "text/html")
+                .body(Body::from(content.data))
+                .unwrap(),
+            None => Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .body(Body::from("Not found"))
+                .unwrap(),
+        },
+    }
+}
 
 mod api;
 mod config;
@@ -63,13 +96,6 @@ async fn main() -> anyhow::Result<()> {
         });
     }
 
-    // Serve the frontend (React build output placed at ./public/ relative to cwd)
-    let static_dir = {
-        let mut p = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-        p.push("public");
-        p
-    };
-
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
@@ -79,12 +105,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/ws", get(websocket::ws_handler))
         .merge(api::router())
         .route("/health", get(|| async { "OK" }))
-        .fallback_service(
-            tower_http::services::ServeDir::new(&static_dir)
-                .not_found_service(tower_http::services::ServeFile::new(
-                    static_dir.join("index.html"),
-                )),
-        )
+        .fallback(serve_asset)
         .layer(cors)
         .layer(RequestBodyLimitLayer::new(max_upload as usize))
         .layer(TraceLayer::new_for_http())
