@@ -167,26 +167,37 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      - name: Set up Android NDK
+      - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK
+        run: sdkmanager "ndk;27.2.12479018"
 
       - name: Configure Android cross-compilation
         run: |
-          NDK_HOME="$ANDROID_SDK_ROOT/ndk/$(ls $ANDROID_SDK_ROOT/ndk | sort -V | tail -1)"
+          NDK_HOME="$ANDROID_SDK_ROOT/ndk/27.2.12479018"
           TOOLCHAIN="$NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
 
           mkdir -p backend/.cargo
           if [[ "${{ matrix.arch }}" == "aarch64" ]]; then
             LINKER="$TOOLCHAIN/aarch64-linux-android${{ matrix.api }}-clang"
             TARGET_KEY="aarch64-linux-android"
+            echo "CC_aarch64_linux_android=$LINKER" >> "$GITHUB_ENV"
+            echo "AR_aarch64_linux_android=$TOOLCHAIN/llvm-ar" >> "$GITHUB_ENV"
           else
+            # NDK names the armv7 wrapper "armv7a-...", but cc-rs resolves it as
+            # "arm-linux-androideabi-clang" from the target triple.  Setting
+            # CC_armv7_linux_androideabi tells cc-rs the exact binary to use.
             LINKER="$TOOLCHAIN/armv7a-linux-androideabi${{ matrix.api }}-clang"
             TARGET_KEY="armv7-linux-androideabi"
+            echo "CC_armv7_linux_androideabi=$LINKER" >> "$GITHUB_ENV"
+            echo "AR_armv7_linux_androideabi=$TOOLCHAIN/llvm-ar" >> "$GITHUB_ENV"
           fi
 
           cat >> backend/.cargo/config.toml << EOF
           [target.$TARGET_KEY]
           linker = "$LINKER"
+          ar = "$TOOLCHAIN/llvm-ar"
           EOF
 
       - name: Build release binary
