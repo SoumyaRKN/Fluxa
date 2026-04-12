@@ -23,8 +23,11 @@ pub fn router() -> Router<AppState> {
         .route("/api/device/info", get(devices::self_info))
         // Connection management
         .route("/api/connect/request", post(connection::request_connection))
+        .route("/api/connect/notify", post(connection::notify_connection))
         .route("/api/connect/accept", post(connection::accept_connection))
+        .route("/api/connect/peer-accept", post(connection::peer_accept_connection))
         .route("/api/connect/reject", post(connection::reject_connection))
+        .route("/api/connect/peer-reject", post(connection::peer_reject_connection))
         .route("/api/sessions", get(connection::list_sessions))
         // Transfer management
         .route("/api/transfer/init", post(transfer::init_transfer))

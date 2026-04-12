@@ -44,7 +44,7 @@ export function Sidebar() {
 
             {/* Footer version */}
             <div className="px-4 pb-2 hidden sm:block">
-                <p className="text-slate-600 text-xs">v1.0.4</p>
+                <p className="text-slate-600 text-xs">v1.0.5</p>
             </div>
         </nav>
     );

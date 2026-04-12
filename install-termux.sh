@@ -39,10 +39,9 @@ ASSET_NAME="fluxa-android-${ARCH_TAG}"
 info "CPU: $ARCH → looking for pre-built binary $ASSET_NAME"
 
 # ── Ensure Termux packages are fully up to date ───────────────────────────────
-# A full upgrade (not just `pkg update + pkg install`) is required to keep all
-# shared libraries consistent.  Partial upgrades are the #1 cause of the
-# "CANNOT LINK EXECUTABLE curl" / libngtcp2_crypto_ossl symbol error.
 info "Upgrading Termux packages (ensures curl/openssl stay in sync)..."
+apt update
+apt full-upgrade
 pkg upgrade -y
 pkg install -y tar
 
@@ -70,7 +69,8 @@ TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
 PREBUILT_OK=0
-if curl -fsSL --head "$DOWNLOAD_URL" 2>/dev/null | grep -q "200\|302"; then
+
+if echo "$API_RESPONSE" | grep -q "\"${ASSET_NAME}\.tar\.gz\""; then
   info "Prebuilt binary found ($LATEST_TAG). Downloading..."
   if curl -fsSL --progress-bar "$DOWNLOAD_URL" -o "$TMP_DIR/fluxa.tar.gz"; then
     tar -xzf "$TMP_DIR/fluxa.tar.gz" -C "$TMP_DIR"

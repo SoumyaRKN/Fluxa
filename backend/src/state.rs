@@ -54,17 +54,25 @@ pub struct Session {
     pub device_id: String,
     pub device_name: String,
     pub device_ip: String,
+    /// Port of the peer device — used to call back for accept/reject.
+    pub device_port: u16,
     pub state: SessionState,
     pub created_at: DateTime<Utc>,
 }
 
 impl Session {
-    pub fn new_pending(device_id: &str, device_name: &str, device_ip: &str) -> Self {
+    pub fn new_pending(
+        device_id: &str,
+        device_name: &str,
+        device_ip: &str,
+        device_port: u16,
+    ) -> Self {
         Session {
             id: Uuid::new_v4().to_string(),
             device_id: device_id.to_string(),
             device_name: device_name.to_string(),
             device_ip: device_ip.to_string(),
+            device_port,
             state: SessionState::Pending,
             created_at: Utc::now(),
         }
