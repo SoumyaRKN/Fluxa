@@ -86,6 +86,12 @@ interface AppStore {
     setSearchQuery: (q: string) => void;
     previewEntry: FileEntry | null;
     setPreviewEntry: (e: FileEntry | null) => void;
+
+    // Clipboard for cut / copy / paste
+    clipboard: { operation: 'copy' | 'cut'; paths: string[] } | null;
+    setClipboard: (c: { operation: 'copy' | 'cut'; paths: string[] } | null) => void;
+    // Batch-select helper (range-select / select-all)
+    selectFiles: (paths: string[]) => void;
 }
 
 export const useAppStore = create<AppStore>()(
@@ -198,5 +204,10 @@ export const useAppStore = create<AppStore>()(
         setSearchQuery: (q) => set((s) => { s.searchQuery = q; }),
         previewEntry: null,
         setPreviewEntry: (e) => set((s) => { s.previewEntry = e; }),
+
+        // Clipboard
+        clipboard: null,
+        setClipboard: (c) => set((s) => { s.clipboard = c; }),
+        selectFiles: (paths) => set((s) => { s.selectedFiles = new Set(paths); }),
     })),
 );
