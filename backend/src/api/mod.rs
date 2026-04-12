@@ -1,9 +1,10 @@
 pub mod connection;
 pub mod devices;
 pub mod files;
+pub mod settings;
 pub mod transfer;
 
-use axum::{routing::{delete, get, post}, Router};
+use axum::{routing::{delete, get, patch, post}, Router};
 use crate::state::AppState;
 
 /// Build the full REST API router.
@@ -36,4 +37,7 @@ pub fn router() -> Router<AppState> {
         // File viewer (text content) and inline preview (images, video, audio, PDF)
         .route("/api/file/view", get(files::view_file))
         .route("/api/file/preview", get(files::preview_file))
+        // Runtime settings
+        .route("/api/settings", get(settings::get_settings))
+        .route("/api/settings", patch(settings::patch_settings))
 }

@@ -2,6 +2,7 @@ use crate::config::Config;
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::{broadcast, RwLock};
 use uuid::Uuid;
@@ -138,9 +139,26 @@ pub struct TransferProgress {
 
 // ── App State ──────────────────────────────────────────────────────────────────
 
+/// Mutable runtime settings — readable and writable via the settings API.
+/// These can be changed without restarting the server.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RuntimeSettings {
+    /// Human-readable device name shown to peers.
+    pub device_name: String,
+    /// Root directory to browse and serve files from.
+    pub root_dir: PathBuf,
+    /// Chunk size (bytes) used when initiating outgoing transfers.
+    pub chunk_size: usize,
+    /// Maximum single-file upload size (bytes).
+    pub max_upload_size: u64,
+}
+
 #[derive(Clone)]
 pub struct AppState {
+    /// Immutable startup config (bind address, port, etc.).
     pub config: Arc<Config>,
+    /// Mutable runtime settings — changeable via the settings API.
+    pub settings: Arc<RwLock<RuntimeSettings>>,
     /// Discovered LAN devices
     pub devices: Arc<RwLock<Vec<DeviceInfo>>>,
     /// Active + pending sessions keyed by session ID
@@ -154,8 +172,15 @@ pub struct AppState {
 impl AppState {
     pub fn new(config: Config) -> Self {
         let (ws_tx, _) = broadcast::channel(256);
+        let settings = RuntimeSettings {
+            device_name: config.device_name.clone(),
+            root_dir: config.root_dir.clone(),
+            chunk_size: config.chunk_size,
+            max_upload_size: config.max_upload_size,
+        };
         AppState {
             config: Arc::new(config),
+            settings: Arc::new(RwLock::new(settings)),
             devices: Arc::new(RwLock::new(Vec::new())),
             sessions: Arc::new(DashMap::new()),
             transfers: Arc::new(DashMap::new()),

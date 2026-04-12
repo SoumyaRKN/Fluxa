@@ -38,6 +38,66 @@ Returns metadata about the currently running Fluxa instance.
 
 ---
 
+## Settings
+
+### `GET /api/settings`
+
+Returns the current runtime settings.
+
+**Response:** `200 OK`
+
+```json
+{
+  "device_name": "MyPC",
+  "root_dir": "/home/user",
+  "chunk_size": 2097152,
+  "max_upload_size": 4294967296
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `device_name` | string | Name shown to other LAN peers |
+| `root_dir` | string | Absolute path of the directory being served |
+| `chunk_size` | integer | Chunk size in bytes for peer transfers |
+| `max_upload_size` | integer | Maximum single-file upload size in bytes |
+
+---
+
+### `PATCH /api/settings`
+
+Update one or more settings at runtime. All fields are optional — only provided fields are changed. Changes take effect immediately without restarting the server.
+
+**Request body:** `application/json` (all fields optional)
+
+```json
+{
+  "device_name": "Office Laptop",
+  "root_dir": "/home/user/shared",
+  "chunk_size": 4194304,
+  "max_upload_size": 10737418240
+}
+```
+
+**Validation constraints:**
+
+| Field | Constraint |
+|---|---|
+| `device_name` | Non-empty string |
+| `root_dir` | Must exist and be a directory on the server filesystem |
+| `chunk_size` | 65 536 – 67 108 864 bytes (64 KiB – 64 MiB) |
+| `max_upload_size` | 1 048 576 – 107 374 182 400 bytes (1 MiB – 100 GiB) |
+
+**Response:** `200 OK` — same shape as `GET /api/settings`, reflecting the updated values.
+
+**Error responses:**
+
+- `400 Bad Request` — validation failed (invalid value or non-existent path)
+
+> **Note:** The bind address and port (`FLUXA_HOST`, `FLUXA_PORT`) are startup-only and cannot be changed via this API.
+
+---
+
 ## File System
 
 ### `GET /api/files?path=/`

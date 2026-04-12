@@ -1,9 +1,9 @@
-import { QrCode, Wifi } from 'lucide-react';
+import { QrCode, Settings, Wifi } from 'lucide-react';
 import logoSvg from '@/assets/logo.svg';
 import { useAppStore } from '@/store';
 
 export function Header() {
-    const { selfInfo, setShowQRModal, devices } = useAppStore();
+    const { selfInfo, setShowQRModal, setShowSettings, devices } = useAppStore();
 
     return (
         <header className="h-14 bg-slate-900/95 backdrop-blur-sm border-b border-slate-800 flex items-center px-4 gap-3 flex-shrink-0 z-10">
@@ -40,6 +40,15 @@ export function Header() {
                 className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
             >
                 <QrCode size={18} />
+            </button>
+
+            {/* Settings button */}
+            <button
+                onClick={() => setShowSettings(true)}
+                title="Settings"
+                className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
+            >
+                <Settings size={18} />
             </button>
         </header>
     );

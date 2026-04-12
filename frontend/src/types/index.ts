@@ -150,3 +150,14 @@ export interface FilePreviewData {
     truncated: boolean;
     encoding: 'utf-8';
 }
+
+// ── Settings ───────────────────────────────────────────────────────────────────
+
+export interface AppSettings {
+    device_name: string;
+    root_dir: string;
+    chunk_size: number;
+    max_upload_size: number;
+}
+
+export type SettingsPatch = Partial<AppSettings>;

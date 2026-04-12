@@ -54,7 +54,7 @@ pub async fn init_transfer(
         }
     }
 
-    let chunk_size = state.config.chunk_size as u64;
+    let chunk_size = state.settings.read().await.chunk_size as u64;
     let total_chunks = body.file_size.div_ceil(chunk_size);
 
     let transfer_id = Uuid::new_v4().to_string();
@@ -116,9 +116,8 @@ pub async fn receive_chunk(
     // Write chunk bytes to disk before updating in-memory state.
     // Chunks are stored at: <root>/._fluxa_temp/<transfer_id>/<index:08>
     {
-        let temp_dir = state
-            .config
-            .root_dir
+        let root_dir = state.settings.read().await.root_dir.clone();
+        let temp_dir = root_dir
             .join("._fluxa_temp")
             .join(&body.transfer_id);
         fs::create_dir_all(&temp_dir).await.map_err(AppError::Io)?;
@@ -269,9 +268,9 @@ async fn reassemble_file(
     dest_path: Option<String>,
 ) -> AppResult<()> {
     let dest_dir = if let Some(p) = dest_path {
-        safe_join(&state.config.root_dir, &p)?
+        safe_join(&state.settings.read().await.root_dir.clone(), &p)?
     } else {
-        state.config.root_dir.join("Downloads")
+        state.settings.read().await.root_dir.join("Downloads")
     };
 
     fs::create_dir_all(&dest_dir).await.map_err(AppError::Io)?;
@@ -279,7 +278,9 @@ async fn reassemble_file(
 
     // Chunks are stored in a temp directory: <root>/._fluxa_temp/<transfer_id>/
     let temp_dir = state
-        .config
+        .settings
+        .read()
+        .await
         .root_dir
         .join("._fluxa_temp")
         .join(transfer_id);

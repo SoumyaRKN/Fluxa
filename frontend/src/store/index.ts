@@ -54,6 +54,8 @@ interface AppStore {
     setActivePanel: (panel: 'files' | 'devices' | 'transfers') => void;
     showQRModal: boolean;
     setShowQRModal: (v: boolean) => void;
+    showSettings: boolean;
+    setShowSettings: (v: boolean) => void;
     pendingConnectionRequest: {
         session_id: string;
         from_device_name: string;
@@ -167,6 +169,8 @@ export const useAppStore = create<AppStore>()(
         setActivePanel: (panel) => set((s) => { s.activePanel = panel; }),
         showQRModal: false,
         setShowQRModal: (v) => set((s) => { s.showQRModal = v; }),
+        showSettings: false,
+        setShowSettings: (v) => set((s) => { s.showSettings = v; }),
         pendingConnectionRequest: null,
         setPendingConnectionRequest: (req) =>
             set((s) => { s.pendingConnectionRequest = req; }),

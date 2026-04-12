@@ -19,9 +19,10 @@ pub async fn self_info(
         .map(|ip| ip.to_string())
         .unwrap_or_else(|_| "127.0.0.1".to_string());
 
+    let s = state.settings.read().await;
     Ok(Json(json!({
-        "id": format!("{}-{}", state.config.device_name, state.config.port),
-        "name": state.config.device_name,
+        "id": format!("{}-{}", s.device_name, state.config.port),
+        "name": s.device_name,
         "ip": ip,
         "port": state.config.port,
         "platform": std::env::consts::OS,

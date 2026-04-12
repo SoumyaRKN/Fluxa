@@ -123,7 +123,8 @@ pub async fn list_files(
 ) -> AppResult<Json<Vec<FileEntry>>> {
     let rel = q.path.unwrap_or_else(|| "/".to_string());
     let show_hidden = q.show_hidden.unwrap_or(false);
-    let dir = safe_join(&state.config.root_dir, &rel)?;
+    let root_dir = state.settings.read().await.root_dir.clone();
+    let dir = safe_join(&root_dir, &rel)?;
 
     if !dir.exists() {
         return Err(AppError::NotFound(format!("Path not found: {rel}")));
@@ -150,7 +151,7 @@ pub async fn list_files(
 
         // Build the path relative to root for API responses
         let path_rel = full
-            .strip_prefix(&state.config.root_dir)
+            .strip_prefix(&root_dir)
             .unwrap_or(&full)
             .to_string_lossy()
             .into_owned();
@@ -202,7 +203,8 @@ pub async fn download_file(
     Query(q): Query<PathQuery>,
 ) -> AppResult<Response> {
     let rel = q.path.ok_or_else(|| AppError::BadRequest("path is required".into()))?;
-    let file_path = safe_join(&state.config.root_dir, &rel)?;
+    let root_dir = state.settings.read().await.root_dir.clone();
+    let file_path = safe_join(&root_dir, &rel)?;
 
     if !file_path.exists() {
         return Err(AppError::NotFound(format!("File not found: {rel}")));
@@ -244,6 +246,10 @@ pub async fn upload_file(
     let mut file_name: Option<String> = None;
     let mut checksum: Option<String> = None;
 
+    let (root_dir, max_upload_size) = {
+        let s = state.settings.read().await;
+        (s.root_dir.clone(), s.max_upload_size)
+    };
     while let Some(field) = multipart.next_field().await.map_err(|e| {
         AppError::BadRequest(format!("Multipart error: {e}"))
     })? {
@@ -273,10 +279,10 @@ pub async fn upload_file(
                 })?;
 
                 // Enforce upload size limit
-                if bytes_data.len() as u64 > state.config.max_upload_size {
+                if bytes_data.len() as u64 > max_upload_size {
                     return Err(AppError::BadRequest(format!(
                         "File exceeds maximum allowed size of {} bytes",
-                        state.config.max_upload_size
+                        max_upload_size
                     )));
                 }
 
@@ -300,9 +306,9 @@ pub async fn upload_file(
 
     // Determine destination directory
     let dest_dir = if let Some(p) = dest_path {
-        safe_join(&state.config.root_dir, &p)?
+        safe_join(&root_dir, &p)?
     } else {
-        state.config.root_dir.clone()
+        root_dir.clone()
     };
 
     fs::create_dir_all(&dest_dir).await.map_err(AppError::Io)?;
@@ -323,7 +329,7 @@ pub async fn upload_file(
     fs::write(&final_path, &data).await.map_err(AppError::Io)?;
 
     let relative = final_path
-        .strip_prefix(&state.config.root_dir)
+        .strip_prefix(&root_dir)
         .unwrap_or(&final_path)
         .to_string_lossy()
         .into_owned();
@@ -341,7 +347,8 @@ pub async fn delete_path(
     Query(q): Query<PathQuery>,
 ) -> AppResult<Json<serde_json::Value>> {
     let rel = q.path.ok_or_else(|| AppError::BadRequest("path is required".into()))?;
-    let target = safe_join(&state.config.root_dir, &rel)?;
+    let root_dir = state.settings.read().await.root_dir.clone();
+    let target = safe_join(&root_dir, &rel)?;
 
     if !target.exists() {
         return Err(AppError::NotFound(format!("Path not found: {rel}")));
@@ -361,8 +368,9 @@ pub async fn rename_path(
     State(state): State<AppState>,
     Json(req): Json<RenameRequest>,
 ) -> AppResult<Json<serde_json::Value>> {
-    let from = safe_join(&state.config.root_dir, &req.from)?;
-    let to = safe_join(&state.config.root_dir, &req.to)?;
+    let root_dir = state.settings.read().await.root_dir.clone();
+    let from = safe_join(&root_dir, &req.from)?;
+    let to = safe_join(&root_dir, &req.to)?;
 
     if !from.exists() {
         return Err(AppError::NotFound(format!("Source not found: {}", req.from)));
@@ -380,8 +388,9 @@ pub async fn copy_path(
     State(state): State<AppState>,
     Json(req): Json<CopyRequest>,
 ) -> AppResult<Json<serde_json::Value>> {
-    let from = safe_join(&state.config.root_dir, &req.from)?;
-    let to = safe_join(&state.config.root_dir, &req.to)?;
+    let root_dir = state.settings.read().await.root_dir.clone();
+    let from = safe_join(&root_dir, &req.from)?;
+    let to = safe_join(&root_dir, &req.to)?;
 
     if !from.exists() {
         return Err(AppError::NotFound(format!("Source not found: {}", req.from)));
@@ -407,7 +416,8 @@ pub async fn make_dir(
     State(state): State<AppState>,
     Json(req): Json<MkdirRequest>,
 ) -> AppResult<Json<serde_json::Value>> {
-    let path = safe_join(&state.config.root_dir, &req.path)?;
+    let root_dir = state.settings.read().await.root_dir.clone();
+    let path = safe_join(&root_dir, &req.path)?;
     if path.exists() {
         return Err(AppError::Conflict(format!("Already exists: {}", req.path)));
     }
@@ -452,8 +462,9 @@ pub async fn delete_paths_batch(
     let mut deleted = 0usize;
     let mut errors: Vec<String> = Vec::new();
 
+    let root_dir = state.settings.read().await.root_dir.clone();
     for path in &req.paths {
-        match safe_join(&state.config.root_dir, path) {
+        match safe_join(&root_dir, path) {
             Ok(target) => {
                 if !target.exists() {
                     errors.push(format!("{path}: not found"));
@@ -487,7 +498,8 @@ pub async fn view_file(
     use tokio::io::AsyncReadExt;
 
     let rel = q.path.ok_or_else(|| AppError::BadRequest("path is required".into()))?;
-    let file_path = safe_join(&state.config.root_dir, &rel)?;
+    let root_dir = state.settings.read().await.root_dir.clone();
+    let file_path = safe_join(&root_dir, &rel)?;
 
     if !file_path.exists() {
         return Err(AppError::NotFound(format!("File not found: {rel}")));
@@ -538,7 +550,8 @@ pub async fn preview_file(
     Query(q): Query<PathQuery>,
 ) -> AppResult<Response> {
     let rel = q.path.ok_or_else(|| AppError::BadRequest("path is required".into()))?;
-    let file_path = safe_join(&state.config.root_dir, &rel)?;
+    let root_dir = state.settings.read().await.root_dir.clone();
+    let file_path = safe_join(&root_dir, &rel)?;
 
     if !file_path.exists() {
         return Err(AppError::NotFound(format!("File not found: {rel}")));

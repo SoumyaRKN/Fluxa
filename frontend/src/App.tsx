@@ -7,6 +7,7 @@ import { DeviceList } from '@/components/DeviceList';
 import { TransferPanel } from '@/components/TransferPanel';
 import { ConnectionModal } from '@/components/ConnectionModal';
 import { QRCodeModal } from '@/components/QRCode';
+import { SettingsModal } from '@/components/Settings';
 import { NotificationStack } from '@/components/Layout/Notifications';
 import { useAppStore } from '@/store';
 import { useWebSocket } from '@/hooks/useWebSocket';
@@ -47,6 +48,7 @@ function AppInner() {
 
       <ConnectionModal />
       <QRCodeModal />
+      <SettingsModal />
       <NotificationStack />
     </div>
   );
