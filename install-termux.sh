@@ -38,9 +38,13 @@ esac
 ASSET_NAME="fluxa-android-${ARCH_TAG}"
 info "CPU: $ARCH → looking for pre-built binary $ASSET_NAME"
 
-# ── Ensure Termux basics are set up ──────────────────────────────────────────
-pkg update -y -o Dpkg::Options::="--force-confnew" 2>/dev/null | tail -3
-pkg install -y curl tar 2>/dev/null | tail -3
+# ── Ensure Termux packages are fully up to date ───────────────────────────────
+# A full upgrade (not just `pkg update + pkg install`) is required to keep all
+# shared libraries consistent.  Partial upgrades are the #1 cause of the
+# "CANNOT LINK EXECUTABLE curl" / libngtcp2_crypto_ossl symbol error.
+info "Upgrading Termux packages (ensures curl/openssl stay in sync)..."
+pkg upgrade -y
+pkg install -y tar
 
 # ── Grant storage access (non-interactive: only prompts if not already done) ──
 if [[ ! -d "$HOME/storage" ]]; then
