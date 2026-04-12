@@ -12,20 +12,21 @@ Open a browser on any device and you're browsing files at full LAN speed.
 3. [Platform Capability Matrix](#platform-capability-matrix)
 4. [Running Fluxa — Platform Guide](#running-fluxa--platform-guide)
    - [Ubuntu / Debian / Linux](#ubuntu--debian--linux)
-   - [Other Linux distros (Fedora, Arch, etc.)](#other-linux-distros)
+   - [Fedora / RHEL / CentOS](#fedora--rhel--centos)
+   - [Arch Linux / Manjaro](#arch-linux--manjaro)
    - [macOS](#macos)
    - [Windows (native)](#windows-native)
    - [Windows — WSL2](#windows--wsl2)
    - [Raspberry Pi / ARM Linux](#raspberry-pi--arm-linux)
-   - [NAS / Server (headless)](#nas--server-headless)
+   - [NAS / Headless Server](#nas--headless-server)
    - [Android — Full Peer via Termux](#android--full-peer-via-termux)
-   - [iOS — Full Peer via iSH (Advanced)](#ios--full-peer-via-ish-advanced)
-   - [Chromebook — Full Peer via Linux container](#chromebook--full-peer-via-linux-container)
-5. [Accessing Fluxa from any device (browser only)](#accessing-fluxa-from-any-device)
-   - [iOS (iPhone / iPad) — browser client](#ios-iphone--ipad)
-   - [Android — browser client](#android)
+   - [iOS — Options and Limitations](#ios--options-and-limitations)
+   - [Chromebook — Full Peer via Linux Container](#chromebook--full-peer-via-linux-container)
+5. [Accessing Fluxa from any device (browser only)](#accessing-fluxa-from-any-device-browser-only)
+   - [iOS (iPhone / iPad) — browser client](#ios-iphone--ipad--browser-client)
+   - [Android — browser client](#android--browser-client)
    - [Another PC or Mac](#another-pc-or-mac)
-   - [Smart TV / Browser](#smart-tv--browser)
+   - [Smart TV / Fire TV / Streaming Device](#smart-tv--fire-tv--streaming-device)
 6. [Using the Interface](#using-the-interface)
 7. [File Explorer Features](#file-explorer-features)
    - [Opening / Previewing Files](#opening--previewing-files)
@@ -107,468 +108,1159 @@ Understanding this distinction is the key to getting **full functionality** on e
 
 ## Running Fluxa — Platform Guide
 
-Fluxa is a single binary. You run it on the machine whose files you want to share.
+> **Quick orientation:** Every section below follows the same pattern:
+>
+> 1. Prerequisites
+> 2. Install dependencies
+> 3. Build Fluxa
+> 4. Run and verify locally
+> 5. Find your IP and connect from another device
+> 6. Optional: run as a background service at boot
+
+---
 
 ### Ubuntu / Debian / Linux
 
-**Prerequisites:** Rust toolchain + Node.js 18+
+**Full capability: ✅ Server · ✅ Discovery · ✅ Transfers · ✅ Browser**
+
+#### Prerequisites
+
+| Requirement | Minimum | Check |
+|------------|---------|-------|
+| Rust toolchain | 1.75+ | `rustc --version` |
+| Node.js | 18+ | `node --version` |
+| npm | 9+ | `npm --version` |
+| Git | any | `git --version` |
+
+#### Step 1 — Install dependencies
 
 ```bash
-# 1. Install Rust (if not already installed)
+sudo apt update && sudo apt upgrade -y
+
+# Node.js 20 LTS via NodeSource
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs git
+
+# Rust toolchain
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-source "$HOME/.cargo/env"
+# At the prompt, press 1 (default install) then Enter
+source "$HOME/.cargo/env"   # or open a new terminal
 
-# 2. Install Node.js (if not already installed)
-sudo apt update && sudo apt install nodejs npm -y
-
-# 3. Install cargo-watch (for development hot-reload, optional)
-cargo install cargo-watch
-
-# 4. Build and run
-cd /path/to/Fluxa
-bash start.sh
+# Verify
+node --version   # v20.x.x
+rustc --version  # rustc 1.75+
 ```
 
-Fluxa will listen on `http://0.0.0.0:7070`.  
-Open **<http://localhost:7070>** in your browser.
-
-To run in the background:
+#### Step 2 — Get Fluxa and build it
 
 ```bash
-nohup bash start.sh &> fluxa.log &
-```
+# Clone the repo (or extract a downloaded archive)
+git clone https://github.com/your-org/Fluxa.git
+cd Fluxa
 
-To run as a systemd service so it starts on boot:
-
-```ini
-# /etc/systemd/system/fluxa.service
-[Unit]
-Description=Fluxa LAN File Server
-After=network.target
-
-[Service]
-ExecStart=/path/to/Fluxa/backend/target/release/fluxa
-WorkingDirectory=/path/to/Fluxa/backend
-Restart=always
-Environment=FLUXA_ROOT=/home/youruser
-
-[Install]
-WantedBy=multi-user.target
-```
-
-```bash
-sudo systemctl enable --now fluxa
-```
-
----
-
-### Other Linux Distros
-
-The steps are identical — just use your distro's package manager:
-
-| Distro | Install Node.js |
-|--------|----------------|
-| Fedora / RHEL | `sudo dnf install nodejs npm` |
-| Arch / Manjaro | `sudo pacman -S nodejs npm` |
-| openSUSE | `sudo zypper install nodejs npm` |
-| Alpine | `apk add nodejs npm` |
-
-After installing Node.js and Rust, run `bash start.sh` as on Ubuntu.
-
----
-
-### macOS
-
-**Prerequisites:** Homebrew, Rust, Node.js
-
-```bash
-# Install Homebrew (if not installed)
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-# Install Rust
-brew install rustup
-rustup-init
-
-# Install Node.js
-brew install node
-
-# Install cargo-watch (optional, for dev mode)
-cargo install cargo-watch
-
-# Build and run
-cd /path/to/Fluxa
-bash start.sh
-```
-
-Open **<http://localhost:7070>** in Safari, Chrome, or Firefox.
-
-> **Firewall note:** macOS may ask "Do you want the application 'fluxa' to accept incoming network connections?" — click **Allow**. This is required for other devices to connect.
-
----
-
-### Windows (native)
-
-**Prerequisites:** Rust (via rustup), Node.js
-
-1. Download and run **rustup-init.exe** from <https://rustup.rs>
-2. Download and install **Node.js** from <https://nodejs.org> (LTS version)
-3. Open **PowerShell** or **Command Prompt**:
-
-```powershell
-# Navigate to the Fluxa folder
-cd C:\path\to\Fluxa
-
-# Build the frontend
+# Build frontend (outputs to backend/public/)
 cd frontend
 npm install
 npm run build
 cd ..
 
-# Build and run the backend
+# Build backend binary (~2–4 min first time)
 cd backend
 cargo build --release
+```
+
+The binary is now at `backend/target/release/fluxa`.
+
+#### Step 3 — Run Fluxa
+
+```bash
+cd Fluxa/backend
+./target/release/fluxa
+```
+
+You should see:
+
+```
+INFO fluxa_backend: Starting Fluxa backend
+INFO fluxa_backend:   Device name : your-hostname
+INFO fluxa_backend:   Root dir    : /home/youruser
+INFO fluxa_backend:   Bind        : 0.0.0.0:7070
+INFO fluxa_backend: Fluxa listening on http://0.0.0.0:7070
+```
+
+Open **<http://localhost:7070>** — you should see the Fluxa UI with your home directory listed.
+
+#### Step 4 — Find your LAN IP (for other devices to connect)
+
+```bash
+ip addr show | grep "inet " | grep -v "127.0.0.1"
+# Example output:  inet 192.168.1.42/24 brd ...
+```
+
+Your LAN URL is `http://192.168.1.42:7070`. Any device on the same network can open this.
+
+#### Step 5 — Open firewall (if UFW is enabled)
+
+```bash
+sudo ufw allow 7070/tcp comment "Fluxa HTTP"
+sudo ufw allow 5353/udp comment "Fluxa mDNS discovery"
+```
+
+#### Step 6 — Run as a service (starts at boot)
+
+```bash
+# Install the binary system-wide
+sudo cp backend/target/release/fluxa /usr/local/bin/fluxa
+
+# Create the service file
+sudo tee /etc/systemd/system/fluxa.service > /dev/null << EOF
+[Unit]
+Description=Fluxa LAN File Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=$USER
+ExecStart=/usr/local/bin/fluxa
+WorkingDirectory=/usr/local/bin
+Environment=FLUXA_ROOT=/home/$USER
+Environment=FLUXA_PORT=7070
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now fluxa
+sudo systemctl status fluxa    # should say "active (running)"
+```
+
+---
+
+### Fedora / RHEL / CentOS
+
+**Full capability: ✅ Server · ✅ Discovery · ✅ Transfers · ✅ Browser**
+
+#### Step 1 — Install dependencies
+
+```bash
+sudo dnf install -y nodejs git
+
+# Rust toolchain
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source "$HOME/.cargo/env"
+
+# Verify
+node --version && rustc --version
+```
+
+#### Step 2 — Build and run
+
+```bash
+git clone https://github.com/your-org/Fluxa.git && cd Fluxa
+cd frontend && npm install && npm run build && cd ..
+cd backend && cargo build --release
+./target/release/fluxa
+```
+
+Open **<http://localhost:7070>**. Your LAN IP: `ip addr show | grep "inet "`.
+
+#### Step 3 — Firewall (firewalld)
+
+```bash
+sudo firewall-cmd --permanent --add-port=7070/tcp
+sudo firewall-cmd --permanent --add-port=5353/udp
+sudo firewall-cmd --reload
+```
+
+#### Step 4 — Service at boot (same as Ubuntu Step 6 above)
+
+```bash
+sudo cp backend/target/release/fluxa /usr/local/bin/fluxa
+# Then create the systemd service as shown in the Ubuntu section
+sudo systemctl enable --now fluxa
+```
+
+---
+
+### Arch Linux / Manjaro
+
+**Full capability: ✅ Server · ✅ Discovery · ✅ Transfers · ✅ Browser**
+
+#### Step 1 — Install dependencies
+
+```bash
+sudo pacman -S --noconfirm nodejs npm git rustup
+rustup default stable
+
+# Verify
+node --version && rustc --version
+```
+
+#### Step 2 — Build and run
+
+```bash
+git clone https://github.com/your-org/Fluxa.git && cd Fluxa
+cd frontend && npm install && npm run build && cd ..
+cd backend && cargo build --release
+./target/release/fluxa
+```
+
+Open **<http://localhost:7070>**. Your LAN IP: `ip addr show | grep "inet "`.
+
+No separate firewall step needed on a default Arch install (no firewall is active by default).  
+If you use `ufw` or `nftables`, allow TCP 7070 and UDP 5353.
+
+---
+
+### macOS
+
+**Full capability: ✅ Server · ✅ Discovery · ✅ Transfers · ✅ Browser**
+
+Tested on macOS 12 Monterey, 13 Ventura, 14 Sonoma, 15 Sequoia (Intel and Apple Silicon).
+
+#### Step 1 — Install Homebrew
+
+Open **Terminal** (Cmd+Space → type "Terminal" → Enter):
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+After install, the tool prints "Next steps:" — follow them to add `brew` to your PATH.  
+On Apple Silicon this typically means adding a line to `~/.zprofile`. Do that, then open a new Terminal window.
+
+#### Step 2 — Install dependencies
+
+```bash
+brew install node rustup git
+rustup-init    # press 1 (default), then Enter
+
+# Reload shell environment
+source "$HOME/.cargo/env"
+
+# Verify
+node --version    # v20.x.x or later
+rustc --version   # rustc 1.75+
+```
+
+#### Step 3 — Build Fluxa
+
+```bash
+cd /path/to/Fluxa
+cd frontend && npm install && npm run build && cd ..
+cd backend && cargo build --release
+```
+
+On **Apple Silicon (M-series)** Rust compiles native ARM64 — fast.  
+On **Intel** Macs it targets x86_64.
+
+#### Step 4 — Run Fluxa and allow the firewall
+
+```bash
+./target/release/fluxa
+```
+
+macOS will show a dialog:
+
+> *"Do you want the application 'fluxa' to accept incoming network connections?"*
+
+Click **Allow**. This is required every time a new binary is built (the hash changes).
+
+Open **<http://localhost:7070>** in Safari or Chrome.
+
+#### Step 5 — Find your LAN IP
+
+```bash
+ipconfig getifaddr en0    # Wi-Fi
+ipconfig getifaddr en1    # Ethernet (if connected)
+# or show all:
+ifconfig | grep "inet " | grep -v 127.0.0.1
+```
+
+Other devices on the same network open `http://YOUR_MAC_IP:7070`.
+
+#### Step 6 — Launch at login (optional)
+
+```bash
+mkdir -p "$HOME/Library/LaunchAgents"
+FLUXA_PATH="$(pwd)/target/release/fluxa"
+
+cat > "$HOME/Library/LaunchAgents/app.fluxa.plist" << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>          <string>app.fluxa</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>$FLUXA_PATH</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>$(pwd)</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>FLUXA_ROOT</key> <string>$HOME</string>
+  </dict>
+  <key>RunAtLoad</key>   <true/>
+  <key>KeepAlive</key>   <true/>
+  <key>StandardOutPath</key>  <string>/tmp/fluxa.log</string>
+  <key>StandardErrorPath</key><string>/tmp/fluxa.log</string>
+</dict>
+</plist>
+EOF
+
+launchctl load "$HOME/Library/LaunchAgents/app.fluxa.plist"
+```
+
+Fluxa now starts automatically every time you log in.
+
+---
+
+### Windows (native)
+
+**Full capability: ✅ Server · ✅ Discovery · ✅ Transfers · ✅ Browser**
+
+Tested on Windows 10 (20H2+) and Windows 11.
+
+#### Step 1 — Install prerequisites
+
+**Rust:**
+
+1. Go to **<https://rustup.rs>** in your browser
+2. Click **"DOWNLOAD RUSTUP-INIT.EXE"**
+3. Run the downloaded file
+4. At the prompt press `1` (default install) → Enter
+5. Wait for the installation to finish
+
+**Node.js:**
+
+1. Go to **<https://nodejs.org>** → click **"LTS"** to download
+2. Run the installer
+3. On the "Tools for Native Modules" page, **tick** "Automatically install the necessary tools" (important for native addons)
+4. Complete the wizard
+
+**Git (optional but useful):**
+
+1. Go to **<https://git-scm.com/download/win>** → download
+2. Run installer, accept all defaults
+
+**Restart PowerShell** after all installs so the new PATH entries take effect.
+
+Verify in a new PowerShell window:
+
+```powershell
+node --version    # v20.x.x
+rustc --version   # rustc 1.75+
+```
+
+#### Step 2 — Build Fluxa
+
+Open **PowerShell** (not CMD):
+
+```powershell
+cd C:\path\to\Fluxa
+
+# Build frontend
+cd frontend
+npm install
+npm run build
+cd ..
+
+# Build backend (first build ~5-10 min)
+cd backend
+cargo build --release
+```
+
+The binary appears at `backend\target\release\fluxa.exe`.
+
+#### Step 3 — Run Fluxa and allow the firewall
+
+```powershell
+cd C:\path\to\Fluxa\backend
 .\target\release\fluxa.exe
 ```
 
-Open **<http://localhost:7070>** in your browser.
+Windows will show a **Windows Defender Firewall** dialog:
 
-> **Windows Defender Firewall:** The first time you run Fluxa, Windows may show a firewall prompt. Click **Allow access** (both Private and Public networks) to let other devices on your LAN connect.
+> *"Windows Defender Firewall has blocked some features of fluxa.exe"*
 
-**Optional: Run via `make`**  
-If you have `make` installed (via Git for Windows or Chocolatey): `make start`
+**Tick both checkboxes:**
+
+- ✅ Private networks, such as my home or work network
+- ✅ Public networks, such as those in airports and coffee shops
+
+Then click **"Allow access"**.
+
+> If you accidentally clicked "Cancel" and no dialog appeared, add the rule manually:  
+> Start → "Windows Defender Firewall with Advanced Security" → Inbound Rules → New Rule → Program → browse to `fluxa.exe` → Allow → apply to all network types → name it "Fluxa".
+
+Open **<http://localhost:7070>** in Edge or Chrome.
+
+#### Step 4 — Find your LAN IP
+
+```powershell
+ipconfig
+```
+
+Look for `IPv4 Address` under your Wi-Fi or Ethernet adapter:
+
+```
+Wireless LAN adapter Wi-Fi:
+   IPv4 Address. . . : 192.168.1.42
+```
+
+Other devices use `http://192.168.1.42:7070`.
+
+#### Step 5 — Auto-start with Windows (optional)
+
+**Simple shortcut method:**
+
+1. Press **Win+R** → type `shell:startup` → Enter
+2. Right-click → **New → Shortcut**
+3. Target: `C:\path\to\Fluxa\backend\target\release\fluxa.exe`
+4. Click Next → name it "Fluxa" → Finish
+5. Right-click the shortcut → Properties → Start In: `C:\path\to\Fluxa\backend`
+
+Fluxa will now launch in a terminal window whenever you log in.
+
+**Background service via Task Scheduler (no window):**
+
+1. Open **Task Scheduler** (search in Start menu)
+2. Action → Create Basic Task → name "Fluxa" → Next
+3. Trigger: "When I log on" → Next
+4. Action: "Start a program" → Next  
+   Program: `C:\path\to\Fluxa\backend\target\release\fluxa.exe`  
+   Start in: `C:\path\to\Fluxa\backend`
+5. Finish → right-click the task → Properties  
+   → General tab → tick "Run whether user is logged on or not"  
+   → tick "Run with highest privileges" → OK
 
 ---
 
 ### Windows — WSL2
 
-If you prefer a Linux environment on Windows:
+**Full capability: ✅ Server · ✅ Discovery · ✅ Transfers · ✅ Browser**
 
-```bash
-# Inside WSL2 terminal
-sudo apt update && sudo apt install nodejs npm -y
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-source "$HOME/.cargo/env"
-cd /path/to/Fluxa
-bash start.sh
+Use this if you prefer a Linux environment on Windows. WSL2 runs a real Linux kernel.
+
+#### Step 1 — Enable WSL2
+
+Open PowerShell **as Administrator**:
+
+```powershell
+wsl --install
 ```
 
-> **Important:** WSL2 has its own network interface. To access Fluxa from other devices on your LAN, find the WSL2 IP:
+Reboot when prompted. After reboot, a Ubuntu terminal window opens automatically and finishes setup (enter a username and password).
+
+If WSL is already installed but you need Ubuntu:
+
+```powershell
+wsl --install -d Ubuntu
+wsl --set-default-version 2
+```
+
+#### Step 2 — Build and run Fluxa inside WSL2
+
+Open the **Ubuntu** terminal (search "Ubuntu" in Start menu). Then follow the **Ubuntu / Debian / Linux** steps above exactly — the environment is a real Ubuntu.
+
+```bash
+# All steps identical to Ubuntu section:
+sudo apt update && sudo apt install -y nodejs git
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source "$HOME/.cargo/env"
+git clone https://github.com/your-org/Fluxa.git && cd Fluxa
+cd frontend && npm install && npm run build && cd ..
+cd backend && cargo build --release
+./target/release/fluxa
+```
+
+On Windows 11, open `http://localhost:7070` in Edge — WSL2 ports are forwarded automatically.
+
+#### Step 3 — Access from other LAN devices
+
+WSL2 uses a private virtual network (`172.x.x.x`). Other devices on your LAN cannot reach it directly. Set up a port proxy from Windows PowerShell (as Administrator):
+
+First, get the WSL2 IP from inside the Ubuntu terminal:
+
+```bash
+ip addr show eth0 | grep "inet "
+# inet 172.24.x.x/20 ...   ← this is your WSL2 IP
+```
+
+Then in PowerShell (Admin):
+
+```powershell
+# Replace 172.24.x.x with your actual WSL2 IP
+netsh interface portproxy add v4tov4 `
+  listenaddress=0.0.0.0 `
+  listenport=7070 `
+  connectaddress=172.24.x.x `
+  connectport=7070
+
+# Open the Windows firewall for this port
+netsh advfirewall firewall add rule `
+  name="Fluxa WSL2" `
+  dir=in action=allow protocol=TCP localport=7070
+```
+
+Now other devices on your LAN can reach Fluxa at your **Windows machine's IP** on port 7070.
+
+Find your Windows IP in PowerShell:
+
+```powershell
+ipconfig | findstr "IPv4"
+```
+
+> **Windows 11 shortcut:** Use mirrored networking to skip the port proxy entirely. In your Windows home directory, create or edit `.wslconfig`:
 >
-> ```bash
-> ip addr show eth0 | grep "inet "
+> ```ini
+> [wsl2]
+> networkingMode=mirrored
 > ```
 >
-> Use that IP (e.g., `http://172.x.x.x:7070`) from other devices.  
-> From the Windows host itself, use `http://localhost:7070`.
+> Save and run `wsl --shutdown`, then restart WSL2. Now WSL2 shares your Windows network interface and is directly reachable at the same IP.
 
 ---
 
 ### Raspberry Pi / ARM Linux
 
-Fluxa supports ARM. The build process is identical to Ubuntu/Linux.
+**Full capability: ✅ Server · ✅ Discovery · ✅ Transfers · ✅ Browser**
+
+Tested on Raspberry Pi 3B+, 4, 5 running Raspberry Pi OS Bookworm (64-bit) and Ubuntu Server 24.04.
+
+#### Step 1 — Set up the Pi (headless / no monitor)
+
+Use **Raspberry Pi Imager** (<https://raspberrypi.com/software/>) on your main PC:
+
+1. Download and run Raspberry Pi Imager
+2. Choose OS → **Raspberry Pi OS (64-bit)** (or Ubuntu Server 24.04 for Pi 4/5)
+3. Choose your SD card
+4. Click the **gear icon** (⚙) to open Advanced Options:
+   - ✅ Enable SSH → Use password authentication
+   - ✅ Set username and password (remember these)
+   - ✅ Configure wireless LAN → enter your Wi-Fi name and password
+   - ✅ Set locale and timezone
+5. Click **Write** and wait
+6. Insert SD card, power on the Pi
+
+#### Step 2 — SSH into the Pi from your main computer
+
+On your main computer (Linux/Mac Terminal or Windows PowerShell):
 
 ```bash
-# On Raspberry Pi (Raspberry Pi OS / Ubuntu)
-sudo apt update && sudo apt install nodejs npm -y
+ssh pi@raspberrypi.local
+# Use the username and password you set in Imager
+# If .local doesn't resolve, find the IP in your router's device list instead
+```
+
+You're now inside the Pi.
+
+#### Step 3 — Install dependencies on the Pi
+
+```bash
+sudo apt update && sudo apt upgrade -y
+
+# Node.js 20 via NodeSource
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs git
+
+# Rust (native ARM — compiles natively, no emulation)
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 source "$HOME/.cargo/env"
 
-cd /path/to/Fluxa
-bash start.sh
+# Verify
+node --version && rustc --version
 ```
 
-> **Performance tip:** The first `cargo build --release` on a Raspberry Pi 4 takes ~10–15 minutes. Subsequent builds are much faster. Once built, the binary runs efficiently.
+#### Step 4 — Build Fluxa
 
-For headless operation (no screen), use the systemd service method described in the Ubuntu section. Then access Fluxa from any other device on your network.
+```bash
+git clone https://github.com/your-org/Fluxa.git
+cd Fluxa
+cd frontend && npm install && npm run build && cd ..
+cd backend && cargo build --release
+```
+
+Expected build times:
+
+| Board | First `cargo build --release` |
+|-------|-------------------------------|
+| Raspberry Pi 5 | ~6 min |
+| Raspberry Pi 4 (4 GB) | ~15 min |
+| Raspberry Pi 3B+ | ~35 min |
+| Pi Zero 2 W | ~50 min |
+
+Grab a coffee. It only happens once.
+
+#### Step 5 — Run Fluxa
+
+```bash
+# Find your Pi's IP address first
+hostname -I    # shows all IPs (Wi-Fi and Ethernet)
+
+# Run Fluxa (sharing the Pi's home directory)
+cd ~/Fluxa/backend
+FLUXA_ROOT=/home/pi FLUXA_DEVICE_NAME="Raspberry Pi" ./target/release/fluxa
+```
+
+From any device on your network: `http://PI_IP:7070`
+
+#### Step 6 — Run as a service (auto-starts at boot, survives SSH disconnect)
+
+```bash
+sudo cp ~/Fluxa/backend/target/release/fluxa /usr/local/bin/fluxa
+
+sudo tee /etc/systemd/system/fluxa.service > /dev/null << 'EOF'
+[Unit]
+Description=Fluxa LAN File Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+ExecStart=/usr/local/bin/fluxa
+WorkingDirectory=/usr/local/bin
+Environment=FLUXA_ROOT=/home/pi
+Environment=FLUXA_PORT=7070
+Environment=FLUXA_DEVICE_NAME=RaspberryPi
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now fluxa
+sudo systemctl status fluxa    # should say "active (running)"
+```
+
+The Pi is now always on the LAN as a discoverable file server. No one needs to be logged in.
+
+#### Optional — Serve files from an external USB drive
+
+```bash
+# Find the drive
+lsblk
+
+# Mount it
+sudo mkdir -p /mnt/usb
+sudo mount /dev/sda1 /mnt/usb
+
+# Run Fluxa pointing at the USB drive
+FLUXA_ROOT=/mnt/usb ./target/release/fluxa
+
+# To auto-mount at boot, add to /etc/fstab:
+# /dev/sda1  /mnt/usb  auto  defaults,nofail  0  0
+```
 
 ---
 
-### NAS / Server (headless)
+### NAS / Headless Server
 
-Run Fluxa on a NAS or server and access it from all your devices:
+**Full capability: ✅ Server · ✅ Discovery · ✅ Transfers · ✅ Browser**
+
+This covers any always-on Linux server: home NAS boxes, old laptops repurposed as servers, Synology/QNAP via SSH, TrueNAS SCALE, Ubuntu Server, etc.
+
+#### Approach 1 — Native Linux NAS (or any Linux server)
+
+Follow the **Ubuntu / Debian** steps. For permanent operation, use the systemd service method so Fluxa starts at boot and runs without anyone logged in.
+
+Point `FLUXA_ROOT` at your share directory:
 
 ```bash
-# Set root to a specific share directory
-FLUXA_ROOT=/data/shares FLUXA_PORT=7070 ./fluxa &
+# Example: serve your media library
+FLUXA_ROOT=/srv/media FLUXA_DEVICE_NAME="Media NAS" /usr/local/bin/fluxa
 ```
 
-Point `FLUXA_ROOT` to whichever directory you want to expose. The server keeps running until killed.
+Multiple instances on different ports for different shares:
+
+```bash
+FLUXA_ROOT=/srv/documents FLUXA_PORT=7070 /usr/local/bin/fluxa &
+FLUXA_ROOT=/srv/media     FLUXA_PORT=7071 /usr/local/bin/fluxa &
+```
+
+#### Approach 2 — Synology NAS (via SSH)
+
+1. In DSM, go to **Control Panel → Terminal & SNMP → Enable SSH**
+2. SSH in: `ssh admin@synology.local`
+3. Because Synology runs a custom Linux on x86_64 or ARM64, build the binary on a **matching architecture** machine and scp it over:
+
+   ```bash
+   # On your Linux PC (same architecture as the NAS):
+   cargo build --release
+   scp backend/target/release/fluxa admin@synology.local:/volume1/@appstore/fluxa/
+   ```
+
+4. On the NAS via SSH:
+
+   ```bash
+   chmod +x /volume1/@appstore/fluxa/fluxa
+   FLUXA_ROOT=/volume1/shares /volume1/@appstore/fluxa/fluxa &
+   ```
+
+5. To start at boot: create a **Triggered Task** in DSM Task Scheduler (Control Panel → Task Scheduler → Create → Triggered Task → Boot-up) that runs:
+
+   ```bash
+   FLUXA_ROOT=/volume1/shares /volume1/@appstore/fluxa/fluxa >> /volume1/logs/fluxa.log 2>&1 &
+   ```
+
+#### Approach 3 — QNAP NAS
+
+1. Enable **SSH** in QNAP's Control Panel → Network & Virtual Switch → Services → SSH
+2. SSH in: `ssh admin@qnap.local`
+3. Copy the x86_64 binary (built on a Linux PC):
+
+   ```bash
+   scp backend/target/release/fluxa admin@qnap.local:/share/Public/fluxa
+   ```
+
+4. On the QNAP:
+
+   ```bash
+   chmod +x /share/Public/fluxa
+   FLUXA_ROOT=/share/Public /share/Public/fluxa &
+   ```
+
+5. For auto-start, add to QNAP's autorun.sh:
+
+   ```bash
+   echo 'FLUXA_ROOT=/share/Public /share/Public/fluxa >> /share/Public/fluxa.log 2>&1 &' \
+     >> /etc/config/autorun.sh
+   ```
 
 ---
 
 ### Android — Full Peer via Termux
 
-**Termux** is a terminal emulator for Android that provides a real Linux environment with native ARM binaries. This makes Android a **full Fluxa peer** — its files appear in the explorer, it is discoverable via mDNS, and it can participate in all transfers.
+**Full capability: ✅ Server · ✅ Discovery · ✅ Transfers · ✅ Browser**
 
-#### Step 1 — Install Termux
+Termux gives Android a real Linux environment with native ARM binaries. Your Android device becomes a **full Fluxa peer** — visible to other devices via mDNS, with browsable files, full bi-directional transfers.
 
-> ⚠️ **Important:** Install from **[F-Droid](https://f-droid.org/packages/com.termux/)**, NOT the Google Play Store. The Play Store version is abandoned and outdated.
+#### Step 1 — Install Termux from F-Droid
 
-1. On your Android device, open a browser and go to **<https://f-droid.org>**
-2. Download and install the F-Droid app (you'll need to allow "Install from unknown sources" in Settings)
-3. Open F-Droid → search for **Termux** → install it
+> ⚠️ **Critical: Do NOT install Termux from the Google Play Store.** The Play Store version is years out of date and broken. Use F-Droid.
 
-#### Step 2 — Grant storage access
+1. On your Android device, open Chrome and visit **<https://f-droid.org>**
+2. Tap **"Download F-Droid"** — it downloads an APK file
+3. Tap the downloaded APK → Android asks "Allow installs from Chrome" → tap **Settings** → enable it → go back → tap **Install**
+4. Open **F-Droid** → wait for the repository index to load (pull down to refresh if needed)
+5. Tap the search 🔍 icon → type "Termux" → install the Termux package (by "Termux" — not clones)
 
-Open Termux and run:
+While in F-Droid, also install:
+
+- **Termux:Boot** — allows Termux scripts to run at boot
+- **Termux:API** — optional device integration (battery info, notifications, etc.)
+
+#### Step 2 — First-time Termux setup
+
+Open the Termux app. You'll see a terminal prompt. Run:
 
 ```bash
+# Update the package manager and all existing packages
+pkg update && pkg upgrade -y
+# (Say Y to any prompts)
+
+# Grant storage access — ESSENTIAL
 termux-setup-storage
 ```
 
-Android will prompt you to grant Termux access to your files. Tap **Allow**.
+Android will show a permission dialog: **"Allow Termux to access photos, media, and files"** — tap **Allow**.
 
-After this, your phone's shared storage is accessible at `~/storage/shared/` (which maps to `/storage/emulated/0/`).
+Without this, Fluxa cannot see your phone's storage.
 
-#### Step 3 — Install Rust, Node.js, and Git
+Verify access:
 
 ```bash
-pkg update && pkg upgrade -y
-pkg install rust nodejs git -y
+ls ~/storage/
+# You should see: dcim  downloads  movies  music  pictures  shared
 ```
 
-> **Note on build time:** The Rust compiler takes a few minutes to install on Android. The first `cargo build --release` takes 15–30 minutes on most phones. Subsequent builds are fast. You only need to build once.
+Android's entire user-accessible storage is at `~/storage/shared/`.
 
-#### Step 4 — Clone and build Fluxa
+#### Step 3 — Disable battery optimization for Termux
+
+Android's battery optimizer will kill Termux while it's running. Fix this before building:
+
+1. Android Settings → **Battery** (or "Battery & performance")
+2. Find **Battery Optimization** or **App Battery Usage**
+3. Find **Termux** → set to **"Don't optimize"** or **"Unrestricted"**
+
+The exact menu path varies by Android version and manufacturer, but search for "battery optimization" in your settings search.
+
+#### Step 4 — Install development tools
+
+```bash
+pkg install rust nodejs git binutils -y
+```
+
+- `rust` — the Rust compiler (native ARM64 — compiles real binaries, not emulated)
+- `nodejs` — for building the React frontend
+- `git` — to clone the repository
+- `binutils` — required linker tools for Rust on Android
+
+> **Installation time:** The Rust package takes 2–4 minutes to download and install.  
+> First `cargo build --release` takes **20–45 minutes** depending on your phone.  
+> This only happens once — future builds are seconds.
+
+#### Step 5 — Clone and build Fluxa
 
 ```bash
 # Clone the repository
 git clone https://github.com/your-org/Fluxa.git
 cd Fluxa
 
-# Build frontend (Node.js)
+# Build the frontend
 cd frontend
 npm install
-npm run build
+npm run build    # ~2–3 minutes
 cd ..
 
-# Build backend (Rust)
+# Build the backend
 cd backend
-cargo build --release
+cargo build --release    # ~20–45 minutes on first build
 ```
 
-#### Step 5 — Run Fluxa on Android
+If you see linker errors like `cannot find -lc`, run `pkg install binutils ldd` and retry.
+
+#### Step 6 — Run Fluxa on your phone
 
 ```bash
-# Share your Downloads folder (adjust path as needed)
+cd ~/Fluxa/backend
+
+# Find your phone's Wi-Fi IP
+ip addr show wlan0 | grep "inet "
+# Example: inet 192.168.1.55/24 ...
+
+# Run Fluxa, sharing all internal storage
 FLUXA_ROOT=$HOME/storage/shared \
-FLUXA_DEVICE_NAME="$(hostname)" \
+FLUXA_DEVICE_NAME="My Android" \
 ./target/release/fluxa
 ```
 
-Fluxa is now running on your phone. Check what IP your phone has on the Wi-Fi:
+You should see:
 
-```bash
-ip addr show wlan0 | grep "inet "
-# Example: inet 192.168.1.55/24
+```
+INFO fluxa_backend: Fluxa listening on http://0.0.0.0:7070
 ```
 
-From any other device on the same network, open `http://192.168.1.55:7070` — you'll see your phone's files.
+From any PC/laptop/tablet on the same Wi-Fi: **<http://192.168.1.55:7070>** — full browser UI showing your phone's files.
 
-Your phone also appears in the **Devices** panel of any other Fluxa instance on the LAN (auto-discovered via mDNS).
+Your phone also appears in the **Devices panel** of any other Fluxa instance auto-discovered via mDNS.
 
-#### Keeping Fluxa running in the background on Android
+#### Step 7 — Keep Fluxa running when the screen turns off
 
-Android aggressively kills background processes. To keep Fluxa running:
+Android suspends background processes. To prevent this:
 
 ```bash
-# Option 1 — Termux wake-lock (prevents sleep, keeps the process alive)
+# Acquire a CPU wake lock (run before launching Fluxa)
 termux-wake-lock
-FLUXA_ROOT=$HOME/storage/shared ./target/release/fluxa &
+
+# Then launch in background
+FLUXA_ROOT=$HOME/storage/shared \
+FLUXA_DEVICE_NAME="My Android" \
+./target/release/fluxa &
 ```
 
-For permanent operation, install **Termux:Boot** from F-Droid to auto-start at boot:
+Keep the Termux notification visible in your notification bar — swiping it away lets Android kill the process.
+
+#### Step 8 — Auto-start at every boot (via Termux:Boot)
+
+Requires Termux:Boot installed from F-Droid and opened at least once.
 
 ```bash
-# Install Termux:Boot via F-Droid on your device, then:
 mkdir -p ~/.termux/boot
-cat > ~/.termux/boot/start-fluxa.sh << 'EOF'
+
+cat > ~/.termux/boot/fluxa.sh << 'EOF'
 #!/data/data/com.termux/files/usr/bin/bash
 termux-wake-lock
 cd ~/Fluxa/backend
-FLUXA_ROOT=$HOME/storage/shared ./target/release/fluxa >> ~/fluxa.log 2>&1 &
+FLUXA_ROOT=$HOME/storage/shared \
+FLUXA_DEVICE_NAME="My Android" \
+./target/release/fluxa >> ~/fluxa.log 2>&1
 EOF
-chmod +x ~/.termux/boot/start-fluxa.sh
+
+chmod +x ~/.termux/boot/fluxa.sh
 ```
 
-#### What Android storage paths to use
+Every reboot automatically starts Fluxa. Your phone is always a discoverable file server on the LAN.
 
-| Path alias | Actual location on phone | Contains |
-|------------|--------------------------|----------|
-| `~/storage/shared` | `/storage/emulated/0` | All user files |
-| `~/storage/downloads` | Downloads folder | Downloads |
-| `~/storage/dcim` | DCIM folder | Photos / Camera roll |
-| `~/storage/pictures` | Pictures folder | Gallery images |
-| `~/storage/music` | Music folder | Audio files |
+#### Android storage paths
 
-#### Troubleshooting Termux
+| Termux shortcut | Maps to on Android | Best for |
+|-----------------|-------------------|---------|
+| `~/storage/shared` | `/storage/emulated/0` — all internal storage | Share everything |
+| `~/storage/downloads` | Downloads folder | Share downloads only |
+| `~/storage/dcim` | DCIM / Camera | Browse phone photos from PC |
+| `~/storage/pictures` | Pictures | Screenshots, gallery |
+| `~/storage/music` | Music | Audio files |
+| `~/storage/movies` | Movies/Videos | Video files |
 
-**`pkg: command not found`** — Termux may not be fully initialized. Run `apt update` first.
+#### Troubleshooting Android/Termux
 
-**Storage not accessible** — Re-run `termux-setup-storage` and tap Allow.
-
-**`cannot find -lc` or linker errors** — Run `pkg install binutils` and retry the build.
-
-**Out of space** — Fluxa builds take ~500 MB of disk. Free up space or move build to external storage.
-
-**mDNS not working** — Some Android phones block multicast traffic. Use direct IP to connect: `http://PHONE_IP:7070`.
+| Problem | Solution |
+|---------|---------|
+| `pkg: command not found` | Open a fresh Termux session — run `apt update` first |
+| Storage shows empty or permission denied | Re-run `termux-setup-storage`, grant the permission |
+| Linker error during `cargo build` | Run `pkg install binutils ldd` then retry |
+| Ran out of space during build | ~500 MB needed; clear space or move files to SD card |
+| Fluxa stops when phone sleeps | Run `termux-wake-lock` before launching; disable battery optimization for Termux |
+| mDNS / auto-discovery not working | Some Android versions block multicast. Connect by direct IP: `http://PHONE_IP:7070` |
+| `getprop: not found` | Replace `$(getprop ro.product.model)` with a static name like `"MyPhone"` |
+| Build takes too long | Normal on older phones. Patience — it only happens once |
 
 ---
 
-### iOS — Full Peer via iSH (Advanced)
+### iOS — Options and Limitations
 
-iOS is the most restrictive mobile platform. Due to sandboxing and the App Store rules, you **cannot run native ARM binaries** directly. The options below all have trade-offs.
+**Capability: ⚠️ No native server · ✅ Browser client (full UI)**
 
-#### Option A — iSH (Alpine Linux emulator) — Recommended
+iOS is the most restrictive platform for running server software. Apple's sandbox and App Store rules prevent running persistent background TCP servers from third-party apps.
 
-**[iSH](https://apps.apple.com/app/ish-shell/id1436902243)** runs an Alpine Linux environment using x86 software emulation. It is the most practical way to run server-side code on iOS.
+#### Understanding what's possible on iOS
 
-> ⚠️ **Important limitations of iSH:**
->
-> - iSH emulates x86 in software — it is **much slower** than native execution
-> - Building Rust from source on iSH is impractical (could take hours)
-> - iSH can be backgrounded for ~30 seconds before iOS suspends it — use a charger and keep the app in the foreground
-> - File access is limited to iSH's internal storage and Apple's Files app sandbox
+| Goal | Possible? |
+|------|----------|
+| Browse another device's Fluxa files | ✅ Yes — open Safari, done |
+| Upload files from iPhone to another Fluxa | ✅ Yes — browser upload works |
+| Download files from another Fluxa to iPhone | ✅ Yes — saves to Files app |
+| Run a Fluxa server so others can browse iPhone files | ⚠️ Limited — see iSH below |
+| Auto-discovery via mDNS | ❌ Not possible from App Store apps |
+| Keep the server running with screen off | ❌ iOS suspends all background apps |
+
+---
+
+#### Option A — Browser client (Recommended for all iOS users)
+
+Zero installation, full UI, works on every iPhone and iPad.
+
+**Steps:**
+
+1. Make sure your iPhone/iPad is on the **same Wi-Fi** as the Fluxa host machine
+2. Connect using the fastest method:
+   - **QR code:** On the host machine, click the QR icon in Fluxa's toolbar → scan with your iPhone Camera app → tap the link
+   - **Direct URL:** Open **Safari** → type `http://HOST_IP:7070`
+3. The Fluxa UI loads — you can:
+   - **Browse** all files on the host machine
+   - **Download** files to your iPhone: they save to the Files app under Downloads
+   - **Upload** from iPhone: tap the ↑ Upload button → iOS file picker appears → choose from Files, Photos, iCloud Drive, Dropbox, etc.
+   - **Preview** images, videos, PDFs, text files in-browser
+
+**Add to Home Screen for app-like access:**
+In Safari, tap the Share button (box with arrow) → **"Add to Home Screen"** → Add. You get a Fluxa icon that opens directly to the file explorer.
+
+---
+
+#### Option B — iSH Shell (serve files from iPhone to others)
+
+**[iSH](https://apps.apple.com/app/ish-shell/id1436902243)** emulates an x86 CPU in software and runs Alpine Linux inside the iOS app sandbox.
+
+**What you must accept before using iSH:**
+
+- ⚠️ x86 emulation is **10–50× slower** than native hardware — do not try to build Rust here
+- ⚠️ iOS suspends iSH ~30 seconds after the app is backgrounded — keep the app open
+- ⚠️ iSH can only access files inside its own sandbox + Files.app locations you explicitly share with it
+- ⚠️ mDNS does not work — other devices cannot auto-discover you, but they can connect by direct IP
+- ⚠️ The server stops when iSH is backgrounded
 
 **Install iSH:**
 
-1. Open the App Store on your iPhone/iPad
-2. Search for **iSH Shell** and install it (it's free)
+1. Open the App Store → search **"iSH Shell"** → install it (free)
+2. Open iSH → you see an Alpine Linux prompt
 
-**Install Node.js (runs at reasonable speed under iSH x86 emulation):**
+**Install Node.js and a static file server:**
 
 ```sh
-apk update && apk add nodejs npm git
+apk update && apk add nodejs npm
+npm install -g serve
 ```
 
-**Build and run only the frontend dev server (limited mode):**
+**Share files from iSH:**
 
-Because Rust is impractical to build in iSH, you can run a **pre-built static copy** of the Fluxa frontend served by a lightweight Node.js static server — but this gives you no backend API. This is primarily useful for testing.
+1. In iSH, go to **Settings** (top-right gear) → **"Enable Files.app integration"** — this mounts your iSH filesystem in the iOS Files app, letting you copy files into it from iCloud/Downloads/etc.
+2. Copy files you want to share into the iSH home directory using the Files app
+3. Serve them:
 
-For a **fully functional server on iOS**, the realistic approach is:
+   ```sh
+   cd ~
+   serve -p 7070 .
+   ```
 
-#### Option B — Run Fluxa on another device, access from iOS browser
+4. Find your iPhone's IP: **iOS Settings → Wi-Fi → tap your network name → IP Address**
+5. From another device on the same Wi-Fi: `http://IPHONE_IP:7070` — shows a basic file listing with download links
 
-This is what most iOS users should do:
-
-1. Run Fluxa on a Mac, PC, or Raspberry Pi
-2. From your iPhone/iPad, open **Safari** → navigate to `http://HOST_IP:7070`
-3. You can browse, upload files from iPhone's Photos/Files app, and download to iPhone
-
-Uploading from iOS: tap ↑ in the Fluxa toolbar → iOS will show a file picker where you can select from Files, Photos, iCloud Drive, etc.
-
-#### Option C — Use a-Shell (JavaScript via QuickJS)
-
-**[a-Shell](https://apps.apple.com/app/a-shell/id1473805438)** provides a terminal with Python, Lua, and a C compiler (via clang to WebAssembly). It cannot run the full Fluxa stack but can be useful for scripting.
-
-#### iOS capability summary
-
-| Feature | iSH | Browser only |
-|---------|-----|-------------|
-| Share iOS files | ⚠️ Limited to iSH sandbox | Upload via browser ✅ |
-| Browse another device's files | ✅ (via browser inside iSH) | ✅ |
-| mDNS auto-discovery | ❌ (iSH cannot bind multicast) | ❌ |
-| Download to iOS | ✅ | ✅ |
-| Upload from iOS Photos | ❌ (iSH) | ✅ (browser) |
-
-**Recommendation:** For casual iOS use, open Fluxa in Safari pointed at your desktop/Mac running Fluxa. For power users who want to expose iOS files: use iSH with `node` serving a simple directory listing, accepting uploads manually.
+**This is not the full Fluxa experience** — no file management UI, no transfers panel, no mDNS. For the full experience, use **Option A**.
 
 ---
 
-### Chromebook — Full Peer via Linux container
+### Chromebook — Full Peer via Linux Container
 
-Chromebooks with the **Linux (Beta) / Crostini** feature can run the full Fluxa server:
+**Full capability: ✅ Server · ✅ Discovery · ✅ Transfers · ✅ Browser**
 
-1. Go to **Settings → Advanced → Developers → Linux development environment** → Turn On
-2. Open the Linux terminal (search "Terminal" in the app launcher)
-3. Follow the **Ubuntu / Debian / Linux** steps above (Chromebook's Linux is Debian-based)
+Requires ChromeOS 69+ (nearly all Chromebooks sold from 2018 onwards).
+
+#### Step 1 — Enable Linux development environment (Crostini)
+
+1. Click the system clock (bottom-right) → **Settings** (gear icon)
+2. In the left sidebar: **Advanced → Developers**
+3. Find **"Linux development environment"** → click **Turn On**
+4. A setup wizard opens — choose at least **5 GB** of disk space for Fluxa builds
+5. Wait for the environment to install (3–5 minutes)
+6. A **Terminal** app now appears in your app launcher
+
+#### Step 2 — Inside the Linux terminal
+
+The Chromebook Linux container is Debian-based. Run exactly the Ubuntu steps:
 
 ```bash
-# Inside ChromeOS Linux terminal
-sudo apt update && sudo apt install nodejs npm -y
+sudo apt update && sudo apt upgrade -y
+
+# Node.js 20
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs git
+
+# Rust
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 source "$HOME/.cargo/env"
-cd ~/Fluxa
-bash start.sh
+
+# Build
+git clone https://github.com/your-org/Fluxa.git
+cd Fluxa
+cd frontend && npm install && npm run build && cd ..
+cd backend && cargo build --release
 ```
 
-> **Network note:** The Linux container runs at `penguin.linux.test` inside ChromeOS, accessible at `http://localhost:7070` from the Chrome browser. To make it reachable from other LAN devices, find the Chromebook's real IP (`ip addr show eth0` inside Linux) and ensure port 7070 is not blocked by any ChromeOS firewall setting.
+#### Step 3 — Run Fluxa on the Chromebook
+
+```bash
+./target/release/fluxa
+```
+
+Open **Chrome** (the regular Chromebook browser) → go to **<http://localhost:7070>**.  
+It works — ChromeOS automatically forwards localhost ports from the Linux container to the Chrome browser.
+
+#### Step 4 — Find the Chromebook's LAN IP (for other devices)
+
+ChromeOS Settings → **Network** → Wi-Fi → tap your network name — note the **IP address** (e.g., `192.168.1.30`).
+
+Other devices on your network open `http://192.168.1.30:7070`.
+
+> **If it doesn't work:** Go to ChromeOS Settings → **Linux** → **Port forwarding** → click **Add** → forward port `7070` (TCP). Then retry.
+
+#### Step 5 — Access your Files app and Google Drive from Fluxa
+
+By default Fluxa only sees the Linux container's own filesystem. To access your Chromebook Downloads, Google Drive, etc.:
+
+```bash
+ls /mnt/chromeos/
+# GoogleDrive/  MyFiles/  removable/
+
+# Share your Downloads folder
+FLUXA_ROOT=/mnt/chromeos/MyFiles/Downloads ./target/release/fluxa
+
+# Or share everything accessible from ChromeOS
+FLUXA_ROOT=/mnt/chromeos ./target/release/fluxa
+```
 
 ---
 
-Once Fluxa is running on the host machine, **any device with a modern browser** can access it — no app download, no account.
+## Accessing Fluxa from any device (browser only)
 
-### Find your host machine's IP address
+Once Fluxa is running on a host machine, **any device with a modern browser** can connect — no app install, no account, no software.
 
-| Platform | Command |
-|----------|---------|
-| Linux | `ip addr show \| grep "inet "` |
-| macOS | `ipconfig getifaddr en0` (Wi-Fi) or `ipconfig getifaddr en1` |
-| Windows | `ipconfig` → look for IPv4 under your Wi-Fi adapter |
+### Find the host's IP address
 
-Example: if the IP is `192.168.1.42`, open `http://192.168.1.42:7070` on any device.
+| Platform | How to find the LAN IP |
+|----------|----------------------|
+| Linux | `ip addr show \| grep "inet "` — exclude `127.0.0.1` |
+| macOS | `ipconfig getifaddr en0` (Wi-Fi) or `en1` (Ethernet) |
+| Windows | `ipconfig` → "IPv4 Address" under your Wi-Fi adapter |
+| Raspberry Pi | `hostname -I` |
+| Android (Termux) | `ip addr show wlan0 \| grep "inet "` |
 
-> **Shortcut:** Click the **QR Code** button in the Fluxa toolbar. It shows a QR code encoding your exact URL — scan it with any phone camera to open instantly.
+Example: IP is `192.168.1.42` → connect to **<http://192.168.1.42:7070>**.
 
----
-
-### iOS (iPhone / iPad)
-
-1. Make sure your iPhone/iPad is on the **same Wi-Fi** as the host machine
-2. Open the **Camera** app → point at the Fluxa QR code → tap the notification banner  
-   **or** open **Safari** and type `http://192.168.1.42:7070` (use your actual IP)
-3. The Fluxa UI loads in the browser
-4. Browse, download, and upload files directly from iOS
-
-> **Notes for iOS:**
->
-> - Safari is recommended. Chrome on iOS also works.
-> - For large file uploads, keep the browser tab active (do not background the app).
-> - Videos, images, audio files, and PDFs can be previewed directly in the browser.
+> **Fastest method:** Click the **QR Code** button in Fluxa's toolbar → scan with any phone camera → browser opens the correct URL instantly.
 
 ---
 
-### Android
+### iOS (iPhone / iPad) — browser client
 
-1. Connect to the same Wi-Fi network as the host
-2. Open **Chrome** (or any browser) and navigate to `http://192.168.1.42:7070`
-3. Browse and transfer files normally
+**What works:** Browse · Download to iPhone · Upload from iPhone Photos/Files/iCloud · Preview images, videos, PDFs
 
-> **Add to home screen:** In Chrome, tap the three-dot menu → **Add to Home screen** for an app-like experience.
+1. Connect iPhone to the **same Wi-Fi** as the Fluxa host
+2. Open **Camera** → scan the QR code shown in Fluxa → tap the notification  
+   **or** open **Safari** → type `http://HOST_IP:7070`
+3. The full Fluxa UI loads
 
-> **Notes for Android:**
->
-> - Chrome provides the best experience.
-> - On Android, you can long-press a downloaded file in Chrome's download bar to share or open it with another app.
+**Uploading from iPhone:**
+
+- Tap the ↑ Upload button in the toolbar
+- iOS file picker appears — choose from **Files** (local + iCloud), **Photos**, Browse, etc.
+- Files upload to the folder currently open in Fluxa on the host
+
+**Downloading to iPhone:**
+
+- Right-click (long-press) any file → **Download**
+- Or double-tap to preview, then tap the Download button
+- Files save to the **Downloads** folder in the iOS Files app
+
+**Tip — Add to Home Screen:**  
+Safari → Share button (□↑) → "Add to Home Screen" → Add. One-tap app-like access.
+
+---
+
+### Android — browser client
+
+**What works:** Browse · Download to Android · Upload from Android · Preview
+
+1. Connect to the same Wi-Fi as the Fluxa host
+2. Open **Chrome** → navigate to `http://HOST_IP:7070`
+
+**Uploading from Android:**
+
+- Tap ↑ Upload → Android file picker opens
+- Choose from Downloads, Photos (DCIM), Documents, SD card, Google Drive, etc.
+
+**Downloading to Android:**
+
+- Long-press a file → Download
+- Chrome shows a notification when done; tap it to open the file
+
+**Tip — Add to Home screen:**  
+Chrome three-dot menu → "Add to Home screen" — gives you an app icon
 
 ---
 
 ### Another PC or Mac
 
-1. Both machines must be on the same network
-2. Open any browser on the second machine
-3. Go to `http://HOST_IP:7070`
-
-Works in Chrome, Firefox, Safari, Opera, and Edge.
-
----
-
-### Chromebook
-
-1. Connect to the same Wi-Fi
-2. Open Chrome and go to `http://HOST_IP:7070`
-3. Everything works natively — no Linux environment needed on the Chromebook
-
----
-
-### Smart TV / Browser
-
-Any Smart TV with a browser app (Samsung, LG, Sony with built-in browsers, or Fire TV Silk browser) can access Fluxa:
-
-1. Open the TV's browser
+1. Open any browser on the second machine
 2. Navigate to `http://HOST_IP:7070`
+3. Full Fluxa UI — browse, drag-and-drop upload, download, preview, manage files
 
-> Interaction is limited by the TV remote, but downloading and streaming media files works well.
+Works in: Chrome, Firefox, Safari, Edge, Opera, Brave.
+
+---
+
+### Smart TV / Fire TV / Streaming Device
+
+**What works:** Browse · Stream video and audio · Download
+
+1. Open the TV's built-in browser:
+   - **Samsung Smart TV:** Apps → Internet
+   - **LG Smart TV:** Home → Web Browser
+   - **Sony Android TV:** install Chrome from Play Store if available
+   - **Amazon Fire TV:** open the Silk browser app
+   - **Apple TV:** no browser — mirror an iPhone running Fluxa in Safari via AirPlay
+2. Navigate to `http://HOST_IP:7070`
+3. Double-click any video/audio file to stream it directly in the browser player
 
 ---
 
