@@ -32,7 +32,7 @@ Returns metadata about the currently running Fluxa instance.
   "ip": "192.168.1.10",
   "port": 7070,
   "platform": "linux",
-  "version": "1.0.2"
+  "version": "1.0.3"
 }
 ```
 
@@ -270,7 +270,7 @@ List all Fluxa devices discovered on the local network via mDNS.
     "ip": "192.168.1.20",
     "port": 7070,
     "platform": "windows",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "discovered_at": "2026-04-12T10:00:00Z"
   }
 ]
