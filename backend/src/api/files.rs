@@ -84,6 +84,14 @@ pub struct PathQuery {
     pub path: Option<String>,
 }
 
+/// Extended query for `list_files` – supports toggling hidden-file visibility.
+#[derive(Debug, Deserialize)]
+pub struct ListQuery {
+    pub path: Option<String>,
+    /// Return entries whose names start with `.`  (default: false)
+    pub show_hidden: Option<bool>,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct RenameRequest {
     pub from: String,
@@ -111,9 +119,10 @@ pub struct DeleteBatchRequest {
 /// GET /api/files?path=/  –  list directory contents
 pub async fn list_files(
     State(state): State<AppState>,
-    Query(q): Query<PathQuery>,
+    Query(q): Query<ListQuery>,
 ) -> AppResult<Json<Vec<FileEntry>>> {
     let rel = q.path.unwrap_or_else(|| "/".to_string());
+    let show_hidden = q.show_hidden.unwrap_or(false);
     let dir = safe_join(&state.config.root_dir, &rel)?;
 
     if !dir.exists() {
@@ -133,6 +142,10 @@ pub async fn list_files(
         };
 
         let name = entry.file_name().to_string_lossy().into_owned();
+        // Skip dot-prefixed (hidden) entries unless the caller requested them
+        if !show_hidden && name.starts_with('.') {
+            continue;
+        }
         let full = entry.path();
 
         // Build the path relative to root for API responses
@@ -464,4 +477,119 @@ pub async fn delete_paths_batch(
         "deleted": deleted,
         "errors": errors,
     })))
+}
+
+/// GET /api/file/view?path=...  –  return text/UTF-8 content (≤ 2 MiB)
+pub async fn view_file(
+    State(state): State<AppState>,
+    Query(q): Query<PathQuery>,
+) -> AppResult<Json<serde_json::Value>> {
+    use tokio::io::AsyncReadExt;
+
+    let rel = q.path.ok_or_else(|| AppError::BadRequest("path is required".into()))?;
+    let file_path = safe_join(&state.config.root_dir, &rel)?;
+
+    if !file_path.exists() {
+        return Err(AppError::NotFound(format!("File not found: {rel}")));
+    }
+    if file_path.is_dir() {
+        return Err(AppError::BadRequest("Cannot view a directory".into()));
+    }
+
+    let meta = fs::metadata(&file_path).await.map_err(AppError::Io)?;
+    let size = meta.len();
+
+    const MAX_VIEW: u64 = 2 * 1024 * 1024; // 2 MiB
+    let read_size = std::cmp::min(size, MAX_VIEW) as usize;
+    let truncated = size > MAX_VIEW;
+
+    let file_name = file_path
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .into_owned();
+    let mime = from_path(&file_name).first_or_octet_stream().to_string();
+
+    let mut buf = vec![0u8; read_size];
+    let mut file = tokio::fs::File::open(&file_path).await.map_err(AppError::Io)?;
+    if read_size > 0 {
+        file.read_exact(&mut buf).await.map_err(AppError::Io)?;
+    }
+
+    if !is_text_mime(&mime) && !is_utf8_heuristic(&buf) {
+        return Err(AppError::BadRequest(
+            "Binary file — use the preview endpoint for media types".into(),
+        ));
+    }
+
+    let content = String::from_utf8_lossy(&buf).into_owned();
+    Ok(Json(serde_json::json!({
+        "content": content,
+        "mime": mime,
+        "size": size,
+        "truncated": truncated,
+        "encoding": "utf-8",
+    })))
+}
+
+/// GET /api/file/preview?path=...  –  stream file with `Content-Disposition: inline`
+pub async fn preview_file(
+    State(state): State<AppState>,
+    Query(q): Query<PathQuery>,
+) -> AppResult<Response> {
+    let rel = q.path.ok_or_else(|| AppError::BadRequest("path is required".into()))?;
+    let file_path = safe_join(&state.config.root_dir, &rel)?;
+
+    if !file_path.exists() {
+        return Err(AppError::NotFound(format!("File not found: {rel}")));
+    }
+    if file_path.is_dir() {
+        return Err(AppError::BadRequest("Cannot preview a directory".into()));
+    }
+
+    let file_name = file_path
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .into_owned();
+    let mime = from_path(&file_name).first_or_octet_stream().to_string();
+
+    let file = fs::File::open(&file_path).await.map_err(AppError::Io)?;
+    let stream = ReaderStream::new(file);
+    let body = Body::from_stream(stream);
+
+    Ok(Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, mime)
+        .header(
+            header::CONTENT_DISPOSITION,
+            format!("inline; filename=\"{file_name}\""),
+        )
+        .body(body)
+        .unwrap())
+}
+
+// ── Text-detection helpers ─────────────────────────────────────────────────────
+
+fn is_text_mime(mime: &str) -> bool {
+    mime.starts_with("text/")
+        || matches!(
+            mime,
+            "application/json"
+                | "application/xml"
+                | "application/javascript"
+                | "application/x-sh"
+                | "application/x-shellscript"
+                | "application/toml"
+        )
+        || mime.contains("+xml")
+        || mime.contains("+json")
+}
+
+fn is_utf8_heuristic(bytes: &[u8]) -> bool {
+    if bytes.is_empty() {
+        return true;
+    }
+    let sample = &bytes[..bytes.len().min(4096)];
+    !sample.contains(&0u8) && std::str::from_utf8(sample).is_ok()
 }

@@ -7,6 +7,9 @@ import type {
     Session,
     SelfInfo,
     TransferItem,
+    ViewLayout,
+    SortField,
+    SortDirection,
 } from '@/types';
 
 interface AppStore {
@@ -68,6 +71,19 @@ interface AppStore {
     notifications: Notification[];
     addNotification: (n: Omit<Notification, 'id'>) => void;
     removeNotification: (id: string) => void;
+
+    // Explorer settings (persisted in-memory for the session)
+    viewLayout: ViewLayout;
+    setViewLayout: (l: ViewLayout) => void;
+    showHidden: boolean;
+    setShowHidden: (v: boolean) => void;
+    sortField: SortField;
+    sortDir: SortDirection;
+    setSort: (field: SortField, dir: SortDirection) => void;
+    searchQuery: string;
+    setSearchQuery: (q: string) => void;
+    previewEntry: FileEntry | null;
+    setPreviewEntry: (e: FileEntry | null) => void;
 }
 
 export const useAppStore = create<AppStore>()(
@@ -165,5 +181,18 @@ export const useAppStore = create<AppStore>()(
             set((s) => {
                 s.notifications = s.notifications.filter((x) => x.id !== id);
             }),
+
+        // Explorer settings
+        viewLayout: 'list',
+        setViewLayout: (l) => set((s) => { s.viewLayout = l; }),
+        showHidden: false,
+        setShowHidden: (v) => set((s) => { s.showHidden = v; }),
+        sortField: 'name',
+        sortDir: 'asc',
+        setSort: (field, dir) => set((s) => { s.sortField = field; s.sortDir = dir; }),
+        searchQuery: '',
+        setSearchQuery: (q) => set((s) => { s.searchQuery = q; }),
+        previewEntry: null,
+        setPreviewEntry: (e) => set((s) => { s.previewEntry = e; }),
     })),
 );

@@ -33,4 +33,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/transfer/list", get(transfer::list_transfers))
         // Batch file operations
         .route("/api/files/delete-batch", post(files::delete_paths_batch))
+        // File viewer (text content) and inline preview (images, video, audio, PDF)
+        .route("/api/file/view", get(files::view_file))
+        .route("/api/file/preview", get(files::preview_file))
 }

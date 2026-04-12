@@ -1,14 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { FileEntry } from '@/types';
+import type { FileEntry, FilePreviewData } from '@/types';
 
 const QUERY_KEY = (path: string) => ['files', path];
 
-export function useFileList(path: string) {
+export function useFileList(path: string, showHidden = false) {
     return useQuery<FileEntry[]>({
-        queryKey: QUERY_KEY(path),
+        queryKey: [...QUERY_KEY(path), showHidden],
         queryFn: async () => {
-            const { data } = await apiClient.get('/api/files', { params: { path } });
+            const { data } = await apiClient.get('/api/files', { params: { path, show_hidden: showHidden } });
             return data;
         },
         staleTime: 5_000,
@@ -94,4 +94,26 @@ export function useCopyMutation(currentPath: string) {
             apiClient.post('/api/copy', { from, to }),
         onSuccess: () => qc.invalidateQueries({ queryKey: QUERY_KEY(currentPath) }),
     });
+}
+
+/**
+ * Fetch text content of a file for in-browser viewing.
+ * Returns null / disabled when `path` is null.
+ */
+export function useFileView(path: string | null) {
+    return useQuery<FilePreviewData>({
+        queryKey: ['file-view', path],
+        queryFn: async () => {
+            const { data } = await apiClient.get('/api/file/view', { params: { path } });
+            return data;
+        },
+        enabled: path !== null,
+        staleTime: 30_000,
+        gcTime: 60_000,
+    });
+}
+
+/** Build a URL that streams the file inline (no forced download). */
+export function previewUrl(filePath: string): string {
+    return `/api/file/preview?path=${encodeURIComponent(filePath)}`;
 }

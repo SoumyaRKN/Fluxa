@@ -137,3 +137,16 @@ export interface Notification {
     message: string;
     duration?: number;
 }
+// ── File Explorer Settings ──────────────────────────────────────────
+
+export type ViewLayout = 'list' | 'grid' | 'table';
+export type SortField = 'name' | 'size' | 'modified' | 'kind';
+export type SortDirection = 'asc' | 'desc';
+
+export interface FilePreviewData {
+    content: string;
+    mime: string;
+    size: number;
+    truncated: boolean;
+    encoding: 'utf-8';
+}
