@@ -8,7 +8,9 @@ Open a browser on any device and you're browsing files at full LAN speed.
 ## Table of Contents
 
 1. [What is Fluxa?](#what-is-fluxa)
-2. [Running Fluxa — Platform Guide](#running-fluxa--platform-guide)
+2. [Two Modes: Server vs Client](#two-modes-server-vs-client)
+3. [Platform Capability Matrix](#platform-capability-matrix)
+4. [Running Fluxa — Platform Guide](#running-fluxa--platform-guide)
    - [Ubuntu / Debian / Linux](#ubuntu--debian--linux)
    - [Other Linux distros (Fedora, Arch, etc.)](#other-linux-distros)
    - [macOS](#macos)
@@ -16,26 +18,28 @@ Open a browser on any device and you're browsing files at full LAN speed.
    - [Windows — WSL2](#windows--wsl2)
    - [Raspberry Pi / ARM Linux](#raspberry-pi--arm-linux)
    - [NAS / Server (headless)](#nas--server-headless)
-3. [Accessing Fluxa from any device (no install)](#accessing-fluxa-from-any-device)
-   - [iOS (iPhone / iPad)](#ios-iphone--ipad)
-   - [Android](#android)
+   - [Android — Full Peer via Termux](#android--full-peer-via-termux)
+   - [iOS — Full Peer via iSH (Advanced)](#ios--full-peer-via-ish-advanced)
+   - [Chromebook — Full Peer via Linux container](#chromebook--full-peer-via-linux-container)
+5. [Accessing Fluxa from any device (browser only)](#accessing-fluxa-from-any-device)
+   - [iOS (iPhone / iPad) — browser client](#ios-iphone--ipad)
+   - [Android — browser client](#android)
    - [Another PC or Mac](#another-pc-or-mac)
-   - [Chromebook](#chromebook)
    - [Smart TV / Browser](#smart-tv--browser)
-4. [Using the Interface](#using-the-interface)
-5. [File Explorer Features](#file-explorer-features)
+6. [Using the Interface](#using-the-interface)
+7. [File Explorer Features](#file-explorer-features)
    - [Opening / Previewing Files](#opening--previewing-files)
    - [Show / Hide Hidden Files](#show--hide-hidden-files)
    - [Layouts (List, Grid, Table)](#layouts-list-grid-table)
    - [Sorting Files](#sorting-files)
    - [Searching Files](#searching-files)
    - [Upload, Download, Delete, Rename, Copy](#upload-download-delete-rename-copy)
-6. [Connecting Devices](#connecting-devices)
-7. [File Transfers Between Devices](#file-transfers-between-devices)
-8. [QR Code Quick Connect](#qr-code-quick-connect)
-9. [Configuration Options](#configuration-options)
-10. [Troubleshooting](#troubleshooting)
-11. [FAQ](#faq)
+8. [Connecting Devices](#connecting-devices)
+9. [File Transfers Between Devices](#file-transfers-between-devices)
+10. [QR Code Quick Connect](#qr-code-quick-connect)
+11. [Configuration Options](#configuration-options)
+12. [Troubleshooting](#troubleshooting)
+13. [FAQ](#faq)
 
 ---
 
@@ -48,6 +52,56 @@ Fluxa turns any computer into a browser-accessible file server on your local net
 - **Transfer** files at full LAN speed (gigabit, if your network supports it)
 - **Discover** other Fluxa devices automatically — no manual IP entry needed
 - **Zero install** on the receiving end — just open a URL
+
+---
+
+## Two Modes: Server vs Client
+
+Understanding this distinction is the key to getting **full functionality** on every platform:
+
+| Mode | What it means | Who needs it |
+|------|--------------|--------------|
+| **Server (full peer)** | You run the Fluxa binary. Your files appear in the file explorer. Other devices can discover you, connect to you, and transfer files to/from you. mDNS broadcasts your presence. | The device whose files you want to share |
+| **Client (browser only)** | You open a browser and point it at a Fluxa server. You can browse, download, and upload to **that** server's files — but your own device's files are not exposed. | Anything that needs to access another device's files |
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Device A (Server)          Device B (Server)                   │
+│  Rust binary running        Rust binary running                  │
+│  Files: /home/alice/        Files: /storage/Android/            │
+│  mDNS: broadcasting ──────→ mDNS: broadcasting                  │
+│         ↑ discovers ←──────                                     │
+│                                                                 │
+│         Both appear in each other's "Devices" panel             │
+│         Either side can initiate transfers                      │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│  Device C (Client only)                                         │
+│  Opens browser → http://192.168.1.42:7070                       │
+│  Can browse Device A's files, upload to it, download from it    │
+│  Cannot be discovered. Cannot share its own files via Fluxa.    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**To get full discovery + transfer capability on any device: run the binary on that device.**
+
+---
+
+## Platform Capability Matrix
+
+| Platform | Run Server | Share Own Files | mDNS Auto-Discovery | Browser Client | Notes |
+|----------|:----------:|:---------------:|:-------------------:|:--------------:|-------|
+| Linux (any) | ✅ | ✅ | ✅ | ✅ | Native — recommended |
+| macOS | ✅ | ✅ | ✅ | ✅ | Allow firewall prompt |
+| Windows | ✅ | ✅ | ✅ | ✅ | Allow Defender Firewall |
+| Raspberry Pi | ✅ | ✅ | ✅ | ✅ | Slow first build |
+| Chromebook (Crostini) | ✅ | ✅ | ✅ | ✅ | Enable Linux container |
+| **Android (Termux)** | ✅ | ✅ | ✅ | ✅ | Full peer — see guide below |
+| **iOS (iSH)** | ⚠️ | ⚠️ | ⚠️ | ✅ | Very slow; see guide below |
+| iOS (browser only) | ❌ | Upload only | ❌ | ✅ | No server possible |
+| Smart TV / Fire TV | ❌ | ❌ | ❌ | ✅ | Browser access only |
+| NAS / headless server | ✅ | ✅ | ✅ | ✅ | Run as service |
 
 ---
 
@@ -242,7 +296,205 @@ Point `FLUXA_ROOT` to whichever directory you want to expose. The server keeps r
 
 ---
 
-## Accessing Fluxa from any device
+### Android — Full Peer via Termux
+
+**Termux** is a terminal emulator for Android that provides a real Linux environment with native ARM binaries. This makes Android a **full Fluxa peer** — its files appear in the explorer, it is discoverable via mDNS, and it can participate in all transfers.
+
+#### Step 1 — Install Termux
+
+> ⚠️ **Important:** Install from **[F-Droid](https://f-droid.org/packages/com.termux/)**, NOT the Google Play Store. The Play Store version is abandoned and outdated.
+
+1. On your Android device, open a browser and go to **<https://f-droid.org>**
+2. Download and install the F-Droid app (you'll need to allow "Install from unknown sources" in Settings)
+3. Open F-Droid → search for **Termux** → install it
+
+#### Step 2 — Grant storage access
+
+Open Termux and run:
+
+```bash
+termux-setup-storage
+```
+
+Android will prompt you to grant Termux access to your files. Tap **Allow**.
+
+After this, your phone's shared storage is accessible at `~/storage/shared/` (which maps to `/storage/emulated/0/`).
+
+#### Step 3 — Install Rust, Node.js, and Git
+
+```bash
+pkg update && pkg upgrade -y
+pkg install rust nodejs git -y
+```
+
+> **Note on build time:** The Rust compiler takes a few minutes to install on Android. The first `cargo build --release` takes 15–30 minutes on most phones. Subsequent builds are fast. You only need to build once.
+
+#### Step 4 — Clone and build Fluxa
+
+```bash
+# Clone the repository
+git clone https://github.com/your-org/Fluxa.git
+cd Fluxa
+
+# Build frontend (Node.js)
+cd frontend
+npm install
+npm run build
+cd ..
+
+# Build backend (Rust)
+cd backend
+cargo build --release
+```
+
+#### Step 5 — Run Fluxa on Android
+
+```bash
+# Share your Downloads folder (adjust path as needed)
+FLUXA_ROOT=$HOME/storage/shared \
+FLUXA_DEVICE_NAME="$(hostname)" \
+./target/release/fluxa
+```
+
+Fluxa is now running on your phone. Check what IP your phone has on the Wi-Fi:
+
+```bash
+ip addr show wlan0 | grep "inet "
+# Example: inet 192.168.1.55/24
+```
+
+From any other device on the same network, open `http://192.168.1.55:7070` — you'll see your phone's files.
+
+Your phone also appears in the **Devices** panel of any other Fluxa instance on the LAN (auto-discovered via mDNS).
+
+#### Keeping Fluxa running in the background on Android
+
+Android aggressively kills background processes. To keep Fluxa running:
+
+```bash
+# Option 1 — Termux wake-lock (prevents sleep, keeps the process alive)
+termux-wake-lock
+FLUXA_ROOT=$HOME/storage/shared ./target/release/fluxa &
+```
+
+For permanent operation, install **Termux:Boot** from F-Droid to auto-start at boot:
+
+```bash
+# Install Termux:Boot via F-Droid on your device, then:
+mkdir -p ~/.termux/boot
+cat > ~/.termux/boot/start-fluxa.sh << 'EOF'
+#!/data/data/com.termux/files/usr/bin/bash
+termux-wake-lock
+cd ~/Fluxa/backend
+FLUXA_ROOT=$HOME/storage/shared ./target/release/fluxa >> ~/fluxa.log 2>&1 &
+EOF
+chmod +x ~/.termux/boot/start-fluxa.sh
+```
+
+#### What Android storage paths to use
+
+| Path alias | Actual location on phone | Contains |
+|------------|--------------------------|----------|
+| `~/storage/shared` | `/storage/emulated/0` | All user files |
+| `~/storage/downloads` | Downloads folder | Downloads |
+| `~/storage/dcim` | DCIM folder | Photos / Camera roll |
+| `~/storage/pictures` | Pictures folder | Gallery images |
+| `~/storage/music` | Music folder | Audio files |
+
+#### Troubleshooting Termux
+
+**`pkg: command not found`** — Termux may not be fully initialized. Run `apt update` first.
+
+**Storage not accessible** — Re-run `termux-setup-storage` and tap Allow.
+
+**`cannot find -lc` or linker errors** — Run `pkg install binutils` and retry the build.
+
+**Out of space** — Fluxa builds take ~500 MB of disk. Free up space or move build to external storage.
+
+**mDNS not working** — Some Android phones block multicast traffic. Use direct IP to connect: `http://PHONE_IP:7070`.
+
+---
+
+### iOS — Full Peer via iSH (Advanced)
+
+iOS is the most restrictive mobile platform. Due to sandboxing and the App Store rules, you **cannot run native ARM binaries** directly. The options below all have trade-offs.
+
+#### Option A — iSH (Alpine Linux emulator) — Recommended
+
+**[iSH](https://apps.apple.com/app/ish-shell/id1436902243)** runs an Alpine Linux environment using x86 software emulation. It is the most practical way to run server-side code on iOS.
+
+> ⚠️ **Important limitations of iSH:**
+>
+> - iSH emulates x86 in software — it is **much slower** than native execution
+> - Building Rust from source on iSH is impractical (could take hours)
+> - iSH can be backgrounded for ~30 seconds before iOS suspends it — use a charger and keep the app in the foreground
+> - File access is limited to iSH's internal storage and Apple's Files app sandbox
+
+**Install iSH:**
+
+1. Open the App Store on your iPhone/iPad
+2. Search for **iSH Shell** and install it (it's free)
+
+**Install Node.js (runs at reasonable speed under iSH x86 emulation):**
+
+```sh
+apk update && apk add nodejs npm git
+```
+
+**Build and run only the frontend dev server (limited mode):**
+
+Because Rust is impractical to build in iSH, you can run a **pre-built static copy** of the Fluxa frontend served by a lightweight Node.js static server — but this gives you no backend API. This is primarily useful for testing.
+
+For a **fully functional server on iOS**, the realistic approach is:
+
+#### Option B — Run Fluxa on another device, access from iOS browser
+
+This is what most iOS users should do:
+
+1. Run Fluxa on a Mac, PC, or Raspberry Pi
+2. From your iPhone/iPad, open **Safari** → navigate to `http://HOST_IP:7070`
+3. You can browse, upload files from iPhone's Photos/Files app, and download to iPhone
+
+Uploading from iOS: tap ↑ in the Fluxa toolbar → iOS will show a file picker where you can select from Files, Photos, iCloud Drive, etc.
+
+#### Option C — Use a-Shell (JavaScript via QuickJS)
+
+**[a-Shell](https://apps.apple.com/app/a-shell/id1473805438)** provides a terminal with Python, Lua, and a C compiler (via clang to WebAssembly). It cannot run the full Fluxa stack but can be useful for scripting.
+
+#### iOS capability summary
+
+| Feature | iSH | Browser only |
+|---------|-----|-------------|
+| Share iOS files | ⚠️ Limited to iSH sandbox | Upload via browser ✅ |
+| Browse another device's files | ✅ (via browser inside iSH) | ✅ |
+| mDNS auto-discovery | ❌ (iSH cannot bind multicast) | ❌ |
+| Download to iOS | ✅ | ✅ |
+| Upload from iOS Photos | ❌ (iSH) | ✅ (browser) |
+
+**Recommendation:** For casual iOS use, open Fluxa in Safari pointed at your desktop/Mac running Fluxa. For power users who want to expose iOS files: use iSH with `node` serving a simple directory listing, accepting uploads manually.
+
+---
+
+### Chromebook — Full Peer via Linux container
+
+Chromebooks with the **Linux (Beta) / Crostini** feature can run the full Fluxa server:
+
+1. Go to **Settings → Advanced → Developers → Linux development environment** → Turn On
+2. Open the Linux terminal (search "Terminal" in the app launcher)
+3. Follow the **Ubuntu / Debian / Linux** steps above (Chromebook's Linux is Debian-based)
+
+```bash
+# Inside ChromeOS Linux terminal
+sudo apt update && sudo apt install nodejs npm -y
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source "$HOME/.cargo/env"
+cd ~/Fluxa
+bash start.sh
+```
+
+> **Network note:** The Linux container runs at `penguin.linux.test` inside ChromeOS, accessible at `http://localhost:7070` from the Chrome browser. To make it reachable from other LAN devices, find the Chromebook's real IP (`ip addr show eth0` inside Linux) and ensure port 7070 is not blocked by any ChromeOS firewall setting.
+
+---
 
 Once Fluxa is running on the host machine, **any device with a modern browser** can access it — no app download, no account.
 
@@ -594,9 +846,7 @@ A: Yes. Set `FLUXA_PORT` to different values for each instance and point `FLUXA_
 
 ---
 
-## What is Fluxa?
-
-Fluxa is a file-sharing tool for your **local network** (home WiFi, office LAN). It lets you:
+*Fluxa — Built with Rust + React*
 
 - **Browse** files on your computer from any browser on the network
 - **Transfer** files between devices at full LAN speed (no internet needed)
@@ -607,306 +857,6 @@ Think of it like AirDrop, but it works on any device with a browser.
 
 ---
 
-## Step 1 – Starting Fluxa
-
-### On Linux / macOS
-
-1. Open a terminal in the Fluxa folder
-2. Run:
-
-   ```bash
-   bash start.sh
-   ```
-
-3. You'll see:
-
-   ```
-   Fluxa listening on http://0.0.0.0:7070
-   ```
-
-4. Open your browser and go to:
-
-   ```
-   http://localhost:7070
-   ```
-
-### On Another Device (Phone, Tablet, etc.)
-
-1. Find your computer's IP address:
-   - Linux: `ip addr show | grep "inet "`
-   - macOS: `ifconfig | grep "inet "`
-   - Windows: `ipconfig`
-2. On the other device's browser, type: `http://YOUR_IP:7070`
-   - Example: `http://192.168.1.10:7070`
-
-> **Tip:** Click the **QR Code** button (top-right) to instantly open Fluxa on your phone — just scan the code with your camera.
-
 ---
 
-## Step 2 – The Interface
-
-```
-┌──────────────────────────────────────────────────────┐
-│ 🌊 Fluxa                           Flash  📡 QR  ⊞ │
-├─────────┬────────────────────────────────────────────┤
-│         │ ← /home/user/                        ⊞ ↑  │
-│  Files  │──────────────────────────────────────────  │
-│  ──── ← │ 📁 Documents         Mar 15   —            │
-│  Devices│ 📁 Downloads         Apr 02   —            │
-│         │ 📄 report.pdf        Apr 10   1.2 MB       │
-│  Trans- │ 📄 photo.jpg         Apr 11   3.5 MB       │
-│  fers   │                                            │
-└─────────┴────────────────────────────────────────────┘
-```
-
-### Left Sidebar
-
-Three sections:
-
-- **Files** – the file explorer (default view)
-- **Devices** – nearby Fluxa devices on your network
-- **Transfers** – file transfer history and active progress
-
-### Top Bar
-
-- **Fluxa logo** – always visible
-- **Device name** (green dot = server is running)
-- **Nearby count** – number of discovered devices
-- **QR Code button** – show QR to connect from phone
-
----
-
-## Step 3 – Browsing Files
-
-1. Click **Files** in the sidebar
-2. You'll see the contents of your home directory
-3. **Double-click** a folder to open it
-4. Use the **← back arrow** to go up one level
-5. Click the **breadcrumb** links at the top to jump to any parent folder
-
----
-
-## Step 4 – Uploading Files
-
-### Method 1: Drag and Drop
-
-1. Open the folder where you want to upload
-2. Drag files from your computer's file manager and **drop them** in the Fluxa file list area
-3. A "Drop to upload" overlay appears — release to upload
-4. Watch the progress bar at the top
-
-### Method 2: File Picker Button
-
-1. Click the **upload icon** (↑) in the toolbar
-2. Select one or more files
-3. They'll upload to the current folder
-
----
-
-## Step 5 – Downloading Files
-
-1. **Right-click** on any file in the file list
-2. Choose **Download** from the context menu
-3. The file will download to your browser's download folder
-
----
-
-## Step 6 – Managing Files
-
-### Create a Folder
-
-1. Click the **folder+ icon** in the toolbar
-2. Type the folder name
-3. Press **Enter** to create
-
-### Rename a File/Folder
-
-1. Right-click the file or folder
-2. Choose **Rename**
-3. Type the new name, press **Enter**
-
-### Copy a File/Folder
-
-1. Right-click the file or folder you want to copy
-2. Choose **Copy here** from the context menu
-3. A copy is created in the **current directory** with `_copy` appended to the name (e.g. `report_copy.pdf`)
-4. If a file with that name already exists, the timestamp is appended to make it unique
-
-> You can rename the copy immediately after by right-clicking the new entry and choosing **Rename**.
-
-### Delete a File/Folder
-
-1. Right-click the file or folder
-2. Choose **Delete**
-3. Confirm the deletion prompt
-
-> ⚠️ Deletion is permanent. There is no recycle bin.
-
-### Delete Multiple Files at Once
-
-1. Click one or more files to select them (they'll highlight)
-2. A **Delete N** button appears in the toolbar (where N is the number selected)
-3. Click it to delete all selected items at once
-4. To clear your selection, click any empty area in the file list
-
-> ⚠️ Batch deletion is also permanent and cannot be undone.
-
----
-
-## Step 7 – Connecting to Another Device
-
-### On Device A (the one sending a connection request)
-
-1. Click **Devices** in the sidebar
-2. You'll see all Fluxa devices on your network listed automatically
-3. Find the device you want to connect to and click **Connect**
-4. A notification will show "Connection request sent to [device name]"
-
-### On Device B (the one receiving)
-
-1. A popup appears: **"[Device A] wants to connect"**
-2. Click **Accept** to allow, or **Reject** to decline
-3. Once accepted, the session becomes Active
-
----
-
-## Step 8 – Transferring Files Between Devices
-
-After establishing a connection (Step 7):
-
-> *Note: In the current version, transfers are initiated via the API. The UI transfer panel shows incoming transfers in real-time.*
-
-File transfer progress is visible in the **Transfers** panel:
-
-- Active transfers show a progress bar with percentage
-- Completed transfers show "Done" with a green checkmark
-- Failed transfers show "Failed" in red
-
-### Clearing Transfer History
-
-Once a transfer is complete or failed, its entry stays in the panel until you clear it.
-
-1. Click the **trash icon** (🗑) button in the top-right of the Transfers panel
-2. All completed and failed entries are removed
-3. Any currently active or pending transfers remain
-
-> The button only appears when there is at least one completed or failed transfer to clear.
-
----
-
-## Step 9 – Using the QR Code (Quick Connect)
-
-1. Click the **QR Code** icon in the top-right
-2. A QR code popup appears showing your device's URL
-3. Scan it with **any smartphone** camera
-4. The phone browser opens Fluxa automatically
-5. Now you can browse and download files from your phone!
-
----
-
-## Tips & Tricks
-
-### Change the Root Directory
-
-By default, Fluxa shows your home directory. To change it:
-
-```bash
-FLUXA_ROOT=/path/to/share bash start.sh
-```
-
-Example – share only your Downloads folder:
-
-```bash
-FLUXA_ROOT=~/Downloads bash start.sh
-```
-
-### Change the Port
-
-```bash
-FLUXA_PORT=8080 bash start.sh
-```
-
-### Change Your Device Name
-
-```bash
-FLUXA_DEVICE_NAME="Office PC" bash start.sh
-```
-
-### Enable Verbose Logging
-
-```bash
-RUST_LOG="fluxa_backend=debug" bash start.sh
-```
-
----
-
-## Troubleshooting
-
-### "No devices found" in the Devices panel
-
-- Make sure both devices are on the **same WiFi network or LAN**
-- Check that no firewall is blocking **UDP port 5353** (mDNS) or **TCP port 7070**
-- Try the **Refresh** button in the Devices panel
-- If mDNS doesn't work, you can still connect manually using the direct URL
-
-### Files don't appear in the list
-
-- Check that `FLUXA_ROOT` points to an accessible directory
-- Make sure the folder has read permissions for your user
-
-### Upload fails with "File exceeds maximum size"
-
-- Default limit is 4 GB per file
-- Increase it with environment variable (advanced users – edit `config.rs`)
-
-### The browser can't connect to Fluxa
-
-1. Make sure Fluxa is running (check the terminal for the listening message)
-2. Check the port: default is 7070
-3. If connecting from another device, use the machine's LAN IP, not `localhost`
-4. Check any VPN software – VPNs often prevent LAN discovery
-
----
-
-## Frequently Asked Questions
-
-**Q: Does Fluxa work over the internet?**  
-A: No, Fluxa is designed for local networks only. All data stays on your LAN.
-
-**Q: Is my data secure?**  
-A: Fluxa uses path traversal protection and consent-based connections. However, it does not use encryption between devices on the same LAN. For sensitive files, use a VPN.
-
-**Q: Can I run Fluxa on Windows?**  
-A: Yes! Build with `cargo build --release` on Windows and run the `.exe` similarly.
-
-**Q: Can multiple people connect at the same time?**  
-A: Yes. Multiple WebSocket clients and sessions are supported concurrently.
-
-**Q: How do I stop Fluxa?**  
-A: Press `Ctrl+C` in the terminal where it's running.
-
-**Q: Where are uploaded files saved?**  
-A: Files are saved in the destination folder you were browsing in the UI. If no folder is specified in the API, files go to `FLUXA_ROOT/Downloads/`.
-
----
-
-## Keyboard Shortcuts (File Explorer)
-
-| Action | Shortcut |
-|---|---|
-| Confirm rename / folder creation | `Enter` |
-| Cancel rename / folder creation | `Escape` |
-| Open context menu | Right-click |
-| Select file | Left-click |
-
----
-
-## Getting Help
-
-- Check [docs/api.md](api.md) for the full API reference
-- Check [README.md](../README.md) for architecture details
-- Open an issue on the project repository
-
----
-
-*Fluxa v0.1.0 – Built with ❤️ in Rust + React*
+*Fluxa — Built with Rust + React*
