@@ -25,3 +25,12 @@ clean:
 check:
 	cd backend && cargo check
 	cd frontend && npx tsc --noEmit
+
+## bump-version VERSION=x.y.z – update version in all manifests
+## Usage: make bump-version VERSION=1.1.0
+bump-version:
+	@if [ -z "$(VERSION)" ]; then echo "Usage: make bump-version VERSION=x.y.z"; exit 1; fi
+	cd backend && cargo-set-version set-version $(VERSION)
+	cd frontend && npm version $(VERSION) --no-git-tag-version
+	sed -i 's/>v[0-9]*\.[0-9]*\.[0-9]*</>v$(VERSION)</g' frontend/src/components/Layout/Sidebar.tsx
+	@echo "Bumped all versions to $(VERSION)"
